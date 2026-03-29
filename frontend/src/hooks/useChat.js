@@ -2,13 +2,14 @@ import { useState, useCallback } from "react";
 import { askQuestion } from "../api/tubeassist";
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
-function makeMessage(role, text, isError = false) {
+function makeMessage(role, text, isError = false, fromVideo = true) {
   return {
     id: crypto.randomUUID(),
     role,
     text,
     timestamp: Date.now(),
     isError,
+    fromVideo,  // ← true = answer from video, false = general LLM knowledge
   };
 }
 
@@ -24,7 +25,7 @@ function makeMessage(role, text, isError = false) {
  *   isVideoReady — guard: chat is disabled until this is true
  *
  * Returns:
- *   messages     — array of { id, role, text, timestamp, isError }
+ *   messages     — array of { id, role, text, timestamp, isError, fromVideo }
  *   isThinking   — true while waiting for AI response
  *   chatStatus   — "thinking" | "error" | null
  *   chatMsg      — message string for StatusBar
@@ -54,13 +55,16 @@ export default function useChat(videoId, isVideoReady) {
     setChatMsg("Thinking…");
 
     try {
-      const data = await askQuestion(question, videoId);           // ← videoId
-      setMessages((prev) => [...prev, makeMessage("ai", data.answer)]);
+      const data = await askQuestion(question, videoId);
+      setMessages((prev) => [
+        ...prev,
+        makeMessage("ai", data.answer, false, data.from_video ?? true),  // ← pass from_video
+      ]);
       setChatStatus(null);
       setChatMsg("");
     } catch (err) {
       const errMsg = err.message || "Something went wrong.";
-      setMessages((prev) => [...prev, makeMessage("ai", errMsg, true)]);
+      setMessages((prev) => [...prev, makeMessage("ai", errMsg, true, true)]);
       setChatStatus("error");
       setChatMsg(errMsg);
     } finally {

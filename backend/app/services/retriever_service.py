@@ -11,19 +11,35 @@ from app.services.vector_store_service import VectorStoreService
 
 class RetrieverService:
 
-    def __init__(self, vector_store_service: VectorStoreService):  # DI for vector_store service 
+    def __init__(self, vector_store_service: VectorStoreService):  # DI for vector_store service
         self.vector_store = vector_store_service.get_vector_store()
-    ## top 4 relevant documents will be returned 
-    def retrieve(self, query: str, k: int = 4, video_id: str | None = None):
-        ## scoped retrieval
+
+    # ── Scoped / global retrieval (used internally) ───────────────────────────
+    def retrieve(self, query: str, k: int = 6, video_id: str | None = None):
         if video_id is not None:
+            ## scoped retrieval — only chunks from this video
             results = self.vector_store.similarity_search(
                 query=query, k=k, filter={"video_id": video_id}
             )
-        else: 
-            ## global retrieval 
+        else:
+            ## global retrieval — all indexed videos
             results = self.vector_store.similarity_search(
                 query=query, k=k
             )
         return results
-    
+
+    # ── Retrieval with relevance scores ───────────────────────────────────────
+    # Returns list of (Document, score) tuples
+    # ChromaDB cosine distance: lower = more relevant (0 = identical, 2 = opposite)
+    def retrieve_with_scores(self, query: str, k: int = 6, video_id: str | None = None):
+        if video_id is not None:
+            ## scoped retrieval with scores
+            results = self.vector_store.similarity_search_with_score(
+                query=query, k=k, filter={"video_id": video_id}
+            )
+        else:
+            ## global retrieval with scores
+            results = self.vector_store.similarity_search_with_score(
+                query=query, k=k
+            )
+        return results  # [(Document, float), ...]

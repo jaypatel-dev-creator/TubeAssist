@@ -94,6 +94,16 @@
   color: #f87171;
 }
 
+/* ── General knowledge badge ── */
+.mb-general-badge {
+  display: block;
+  font-size: 11px;
+  color: #f59e0b;
+  margin-top: 8px;
+  font-style: italic;
+  opacity: 0.85;
+}
+
 /* ── Thinking bubble ── */
 .mb-thinking {
   display: flex;

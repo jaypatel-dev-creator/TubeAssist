@@ -8,7 +8,7 @@ function formatTime(timestamp) {
   });
 }
 
-
+// ─── Icons ────────────────────────────────────────────────────────────────────
 const BotIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2"
@@ -21,7 +21,7 @@ const BotIcon = () => (
   </svg>
 );
 
-
+// ─── Thinking bubble (exported for ChatWindow) ────────────────────────────────
 export function ThinkingBubble() {
   return (
     <div className="mb-row ai">
@@ -39,12 +39,17 @@ export function ThinkingBubble() {
   );
 }
 
-
+// ─── Component ────────────────────────────────────────────────────────────────
+/**
+ * MessageBubble
+ *
+ * Props:
+ *   message — { id, role, text, timestamp, isError, fromVideo }
+ */
 export default function MessageBubble({ message }) {
-  const { role, text, timestamp, isError } = message;
+  const { role, text, timestamp, isError, fromVideo } = message;
 
   const isUser = role === "user";
-
   const avatarLabel = isUser ? "You" : <BotIcon />;
 
   const bubbleClass = [
@@ -65,6 +70,13 @@ export default function MessageBubble({ message }) {
           role={isError ? "alert" : undefined}
         >
           {text}
+
+          {/* General knowledge badge — only on AI messages not from video */}
+          {role === "ai" && fromVideo === false && !isError && (
+            <span className="mb-general-badge">
+              ⓘ General knowledge — not from video
+            </span>
+          )}
         </div>
       </div>
 
