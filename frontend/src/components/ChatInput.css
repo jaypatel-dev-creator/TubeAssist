@@ -1,0 +1,112 @@
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Wrapper ── */
+.ci-wrap {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 14px 16px;
+  background: #1a1a1f;
+  border-top: 1px solid #2e2e38;
+  animation: fadeIn 0.2s ease;
+}
+
+/* ── Textarea ── */
+.ci-textarea-wrap {
+  flex: 1;
+  position: relative;
+}
+
+.ci-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  max-height: 140px;
+  background: #0f0f11;
+  border: 1.5px solid #2e2e38;
+  border-radius: 12px;
+  color: #e8e8f0;
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  padding: 11px 14px;
+  outline: none;
+  resize: none;
+  overflow-y: auto;
+  transition: border-color 0.18s, box-shadow 0.18s;
+  caret-color: #6366f1;
+  display: block;
+}
+
+.ci-textarea::placeholder {
+  color: #6b6b7e;
+}
+
+.ci-textarea:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.ci-textarea:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Send button ── */
+.ci-send-btn {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  background: #6366f1;
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, transform 0.1s, opacity 0.15s;
+}
+
+.ci-send-btn:hover:not(:disabled) {
+  background: #818cf8;
+}
+
+.ci-send-btn:active:not(:disabled) {
+  transform: scale(0.93);
+}
+
+.ci-send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ci-send-btn.thinking {
+  background: #2e2e40;
+}
+
+/* spinner inside send button */
+.ci-send-btn.thinking svg {
+  animation: spin 0.8s linear infinite;
+}
+
+/* ── Guard hint (shown before video is loaded) ── */
+.ci-guard-hint {
+  text-align: center;
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  font-size: 12px;
+  color: #6b6b7e;
+  padding: 10px 16px 4px;
+  animation: fadeIn 0.2s ease;
+}
+
+.ci-guard-hint span {
+  color: #6366f1;
+}
