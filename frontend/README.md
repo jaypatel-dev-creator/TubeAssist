@@ -4,8 +4,6 @@ React-based chat interface for the TubeAssist RAG pipeline. Handles video ingest
 
 ---
 
-
-
 ## Project Structure
 
 ```
@@ -14,18 +12,18 @@ src/
 │   ├── VideoInput.jsx       # URL field, validation, load state
 │   ├── ChatWindow.jsx       # scrollable message list, auto-scroll
 │   ├── ChatInput.jsx        # auto-resize textarea, Enter to send
-│   ├── MessageBubble.jsx    # user/AI bubbles + thinking indicator
+│   ├── MessageBubble.jsx    # user/AI bubbles + general knowledge badge
 │   └── StatusBar.jsx        # processing / thinking / error / success states
 ├── hooks/
-│   ├── useVideoIngest.js    # ingestion state, video_id, video_title
-│   └── useChat.js           # message history
+│   ├── useVideoIngest.js    # ingestion state, video_id, video_title, status error handling
+│   └── useChat.js           # message history, from_video flag
 ├── api/
 │   ├── client.js            # axios base instance + interceptors
 │   └── tubeassist.js        # ingestVideo(), askQuestion()
 ├── utils/
 │   └── validateYouTubeUrl.js
 ├── App.jsx                  # layout + state orchestration
-└── index.css                
+└── index.css
 ```
 
 ---
@@ -45,30 +43,33 @@ client.interceptors.response.use(
 Two endpoints consumed:
 
 ```js
-POST /videos/ingest   → { url }                        → { video_id, video_title, status }
-POST /chat/ask        → { question, video_id }          → { answer, sources }
+POST /videos/ingest  → { url }               → { status, video_id, video_title }
+POST /chat/ask       → { question, video_id } → { answer, sources, from_video }
 ```
 
 ---
-
-
 
 ## Setup
 
 ```bash
 cd frontend
 npm install
-
 cp .env.example .env
-# set VITE_API_URL=http://localhost:8000
-
 npm run dev
 ```
 
+---
 
 ## Key Implementation Notes
 
-**Guard condition** — `ChatInput` is fully disabled until a video is successfully ingested.
+**Status error handling** — backend returns `{ status: "error", message: "..." }` as HTTP 200 for handled failures. `useVideoIngest` explicitly checks `data.status === "error"` — preventing "Untitled Video" from appearing on failed ingestion.
 
-**Already indexed** — backend returns `status: "already_indexed"` for duplicate videos. Frontend handles this as a success path with a distinct status message — no re-ingestion triggered.
+**`from_video` flag** — `useChat` reads `data.from_video` from each response and stores it on the message object. `MessageBubble` renders an amber "General knowledge — not from video" badge when `fromVideo === false`.
 
+**Guard condition** — `ChatInput` disabled until `isVideoReady = !!videoTitle && !isIngesting`.
+
+**Already indexed** — `status: "already_indexed"` handled as success path with distinct status message.
+
+**Optimistic updates** — user messages appended immediately before API call resolves.
+
+**Chat reset** — `useEffect` watches `isIngesting` and calls `resetChat()` on new video load.
