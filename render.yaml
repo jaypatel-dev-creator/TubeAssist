@@ -12,8 +12,8 @@ services:
       - key: VECTOR_STORE
         value: pinecone
       - key: PINECONE_API_KEY
-        sync: false
+        sync: false ## ths too must be entered in render dashboard
       - key: PINECONE_INDEX
-        value: tubeassist
+        value: tubeassist ## no need to enter in render dashboard
       - key: PYTHON_VERSION
-        value: 3.11.0
+        value: 3.11.0 ## no need to enter 

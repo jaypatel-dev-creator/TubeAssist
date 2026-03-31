@@ -9,9 +9,12 @@ app = FastAPI() ## main application instance => everything routes, midldlweares 
 # ── CORS must be registered BEFORE routers ──
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"], ## react runs on 5173
-    allow_methods=["*"], # allow get, put , post , delete
-    allow_headers=["*"], # allow all headers 
+    allow_origins=[
+        "http://localhost:5173",           # local dev
+        "https://tubeassist.vercel.app"    # ← add your Vercel URL
+    ],
+    allow_methods=["*"], ## allow get,post
+    allow_headers=["*"], ## allow all headers 
 )
 
 # ── Routers registered AFTER middleware ──
