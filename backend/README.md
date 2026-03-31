@@ -214,15 +214,7 @@ uvicorn app.main:app --reload
 - No user session isolation — single shared memory instance per server process
 - Whisper fallback is slow on CPU (~2-4 min for a 5 min video with `base` model)
 
----
 
-## Future Improvements
-
-- Session-based persistent memory
-- Multi-user support with isolated memory per session
-- Streaming responses
-- Advanced RAG techniques (HyDE, re-ranking, MMR)
-- RAG evaluation metrics (faithfulness, relevance, context recall, context accuracy)
 
 
 ---

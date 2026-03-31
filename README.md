@@ -74,8 +74,17 @@ YouTube URL
 ### Retrieval-Augmented Generation (RAG)
 Instead of relying on the LLM's training knowledge, TubeAssist retrieves factual context directly from the video transcript before generating a response. This grounds every answer in actual video content and reduces hallucinations.
 
-### Relevance-Score Filtering
-Retrieved chunks are filtered by cosine distance score (threshold = 0.7). Chunks scoring above the threshold are considered irrelevant — triggering the LLM fallback instead of passing noisy context to Gemini. This prevents the LLM from generating misleading answers from unrelated chunks.
+### Two-Stage Relevance Filtering
+
+Retrieved chunks go through two relevance checks before reaching the LLM:
+
+**Stage 1 — Score-based filter (fast, no LLM call):**
+Chunks are filtered by cosine distance threshold — `0.7` for both ChromaDB and Pincone. Chunks that don't pass this filter trigger the LLM general knowledge fallback immediately.
+
+**Stage 2 — LLM-based relevance check (semantic, accurate):**
+Even if chunks pass the score filter, Gemini is instructed to return a sentinel string `NO_RELEVANT_CONTEXT` if the retrieved context is not relevant to the question. This catches subtle irrelevance that pure distance metrics miss — the LLM understands meaning, not just vector proximity. A `NO_RELEVANT_CONTEXT` response triggers the general knowledge fallback.
+
+Both stages route to the same `_llm_fallback()` — answering from general knowledge and returning `from_video: false` to the frontend..
 
 ### Dual Transcript Strategy
 yt-dlp is used as the primary caption extractor (fast, no compute). If no captions are available, FasterWhisper transcribes the audio locally as fallback. The Whisper model loads lazily — only when actually needed — keeping RAM usage low on free-tier servers.
@@ -333,3 +342,14 @@ VITE_API_URL=http://localhost:8000
 **Why lazy Whisper loading?** FasterWhisper base model requires ~600MB RAM. Loading at startup on Render's free tier (512MB) would cause immediate OOM crashes. Lazy loading means Whisper only loads when a video has no captions — most tech and educational videos have auto-generated captions, so Whisper rarely fires in practice.
 
 **Why Pinecone for production?** ChromaDB is embedded — it writes to disk. Render's free tier has ephemeral storage that wipes on every deploy. Pinecone is cloud-hosted and persistent regardless of server restarts or redeployments.
+
+
+---
+
+### Future Improvements
+
+- Session-based persistent memory
+- Multi-user support with isolated memory per session
+- Streaming responses
+- Advanced RAG techniques (HyDE, re-ranking, MMR)
+- RAG evaluation metrics (faithfulness, relevance, context recall, context accuracy)
