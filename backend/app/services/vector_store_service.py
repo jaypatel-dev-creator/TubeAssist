@@ -34,7 +34,7 @@ class VectorStoreService:
         from pinecone import Pinecone, ServerlessSpec
         from langchain_pinecone import PineconeVectorStore
 
-        pc = Pinecone(api_key=PINECONE_API_KEY)
+        pc = Pinecone(api_key=PINECONE_API_KEY) #authenticating with pinecone 
 
         # create index if it doesn't exist
         existing_indexes = [i.name for i in pc.list_indexes()]
@@ -48,40 +48,41 @@ class VectorStoreService:
                     region="us-east-1" ## database is being hosted on aws US east 1 
                 )
             )
-
+         
         return PineconeVectorStore(
             index_name=PINECONE_INDEX,
             embedding=self.embedding_function,
             pinecone_api_key=PINECONE_API_KEY
         )
 
-    # ── Common interface (same for both Chroma and Pinecone) ──────────────────
-    def get_vector_store(self):
+    # ── Common interface (same methods for both the backends) 
+    def get_vector_store(self): # returns raw vector_store object  (used in retriever_service )
         return self.vector_store
 
-    def add_documents(self, documents):
+    def add_documents(self, documents):  # adds document in store
         self.vector_store.add_documents(documents)
 
-    def similarity_search(self, query, k, filter=None):
+    def similarity_search(self, query, k, filter=None): ## runs vector search (cosine) and returns top k relevant chunks 
         return self.vector_store.similarity_search(
             query, k=k, filter=filter
         )
 
-    def video_exists(self, video_id: str) -> bool:
+    def video_exists(self, video_id: str) -> bool:  ## checks  whether the video is already stored in database 
         if self.store_type == "pinecone":
             return self._video_exists_pinecone(video_id)
         return self._video_exists_chroma(video_id)
 
-    def _video_exists_chroma(self, video_id: str) -> bool:
-        results = self.vector_store.get(
-            where={"video_id": video_id}, limit=1
+    def _video_exists_chroma(self, video_id: str) -> bool: #chroma allows direct lookup with metadata
+        results = self.vector_store.get( 
+            where={"video_id": video_id}, limit=1 
         )
         return bool(results["ids"])
 
-    def _video_exists_pinecone(self, video_id: str) -> bool:
+    def _video_exists_pinecone(self, video_id: str) -> bool: 
         results = self.vector_store.similarity_search(
-            query="exists",
-            k=1,
-            filter={"video_id": video_id}
+            query="exists", # just a garbage value because pinecone dosent allow direct lookup with metadatas, it only allow lookup to a  query 
+            k=1, 
+            filter={"video_id": video_id} # by this filter , if any chunks returns, then video is already stored. 
         )
         return bool(results)
+    

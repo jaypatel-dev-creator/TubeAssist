@@ -1,8 +1,8 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
-from app.core.config import GEMINI_API_KEY
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from app.services.retriever_service import RetrieverService
 from app.services.memory_service import MemoryService
+from app.core.config import GEMINI_API_KEY
 
 
 class RAGService:
@@ -21,15 +21,20 @@ class RAGService:
             temperature=0.3
         )
 
-        # ── RAG prompt — used when relevant chunks are found ──────────────────
+        # RAG prompt => when relevant document are found 
+        # Stage 2 filter — if context is irrelevant, LLM returns "NO_RELEVANT_CONTEXT" which wil return llm fallback 
+      
         self.prompt = ChatPromptTemplate.from_messages([
             (
                 "system",
                 """You are a helpful assistant that answers questions about a YouTube video.
-Use the provided transcript context to answer the user's question.
-If the answer can be inferred or derived from the context, answer it fully.
-If the context is insufficient, answer using your general knowledge but keep the answer related to the video topic.
-Do not hallucinate or make up facts."""
+You will be given transcript context and a user question.
+
+Follow these rules strictly:
+1. If the context is relevant to the question — answer using the context fully
+2. If the context is NOT relevant to the question — respond with exactly this phrase and nothing else:
+   "NO_RELEVANT_CONTEXT"
+Do not hallucinate. Do not make up facts."""
             ),
             MessagesPlaceholder(variable_name="chat_history"),
             (
@@ -39,9 +44,10 @@ Do not hallucinate or make up facts."""
             )
         ])
 
-        # ── General prompt — used when no relevant chunks found ───────────────
-        # Fires when all retrieved chunks score above the relevance threshold
-        # OR when ChromaDB returns zero docs entirely.
+        # ── General prompt  @ LLM fallback 
+        # Fires when:
+        # Stage 1 — all chunks score above threshold (score filter) => stage 1 filter 
+        # Stage 2 — LLM flags context as irrelevant (NO_RELEVANT_CONTEXT) => stage 2 filter 
         self.general_prompt = ChatPromptTemplate.from_messages([
             (
                 "system",
@@ -56,6 +62,19 @@ Be concise and accurate."""
             )
         ])
 
+    def _llm_fallback(self, question: str, chat_history: list):
+        messages = self.general_prompt.format_messages(
+            chat_history=chat_history,
+            question=question
+        )
+        response = self.llm.invoke(messages)
+        self.memory.save(question, response.content)
+        return {
+            "answer": response.content,
+            "sources": [],
+            "from_video": False  # ← frontend shows "General knowledge" badge
+        }
+
     def ask(self, question: str, video_id: str | None = None):
 
         # retrieve chunks with relevance scores
@@ -63,39 +82,35 @@ Be concise and accurate."""
             query=question, video_id=video_id
         )
 
-        # ChromaDB cosine distance — lower = more relevant
-        # 0.0 = identical, 0.7+ = likely irrelevant to the question
+        # ── Stage 1: Score-based filter ───────────────────────────────────────
+        #both chroma and pinecone => threshold 0.7 
         THRESHOLD = 0.7
         relevant_docs = [doc for doc, score in docs_with_scores if score < THRESHOLD]
 
-        # ── LLM fallback — no relevant chunks found ───────────────────────────
-        # Fires when:
-        # 1. ChromaDB returns zero docs (video not indexed)
-        # 2. All retrieved chunks score above threshold (unrelated question)
-        if not relevant_docs:
-            chat_history = self.memory.get_history()
-            messages = self.general_prompt.format_messages(
-                chat_history=chat_history,
-                question=question
-            )
-            response = self.llm.invoke(messages)
-            self.memory.save(question, response.content)
-            return {
-                "answer": response.content,
-                "sources": [],
-                "from_video": False  # ← frontend shows "General knowledge" badge
-            }
+        chat_history = self.memory.get_history()
 
-        # ── RAG flow — relevant chunks found ─────────────────────────────────
+        # Stage 1 llm  fallback — no chunks passed score filter
+        if not relevant_docs:
+            return self._llm_fallback(question, chat_history)
+
+    # when relevant context found, then RAG prompt will be fired. 
         context = "\n\n".join(doc.page_content for doc in relevant_docs)  ## combine relevant chunks
-        chat_history = self.memory.get_history()                           ## load chat history
         messages = self.prompt.format_messages(                            ## build prompt
             chat_history=chat_history,
             context=context,
             question=question
         )
         response = self.llm.invoke(messages)           ## calling llm
-        self.memory.save(question, response.content)   ## storing conversation in memory
+
+
+        # ── Stage 2: LLM-based relevance check ───────────────────────────────
+        # Even if chunks pass score filter, LLM verifies context is actually relevant, when LLM flagged context as irrelevant, then again llm fallback 
+    
+        if response.content.strip() == "NO_RELEVANT_CONTEXT":
+            return self._llm_fallback(question, chat_history)
+
+       
+        self.memory.save(question, response.content)   ## storing conversation in memory (both rag and llm fallback answer is stored. )
 
         return {
             "answer": response.content,
