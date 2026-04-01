@@ -16,4 +16,4 @@ services:
       - key: PINECONE_INDEX
         value: tubeassist ## no need to enter in render dashboard
       - key: PYTHON_VERSION
-        value: 3.11.0 ## no need to enter 
+        value: 3.12.0   ## no need to enter 
