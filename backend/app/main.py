@@ -11,7 +11,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",           # local dev
-         "https://tube-assist.vercel.app/" #deployed vercel url
+        "https://tube-assist.vercel.app" #deployed vercel url
     ],
     allow_methods=["*"], ## allow get,post
     allow_headers=["*"], ## allow all headers 
