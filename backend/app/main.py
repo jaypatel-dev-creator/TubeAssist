@@ -17,13 +17,11 @@ app.add_middleware(
     allow_headers=["*"], ## allow all headers 
 )
 
-# ── Routers registered AFTER middleware ──
-## default router/ endpoint 
 @app.get("/")
 def root():
     return {"message": "Welcome to TubeAssist API"}
 
-## about endpoint 
+
 @app.get("/about")
 def about():
     return {

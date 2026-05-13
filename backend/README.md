@@ -14,7 +14,7 @@ FastAPI backend implementing a full RAG pipeline over YouTube video transcripts.
 | Pinecone | Cloud vector store (production) |
 | Gemini 2.5 Flash | LLM for answer generation |
 | Gemini Embeddings | Text → vector conversion (3072 dimensions) |
-| yt-dlp | Primary caption extraction + video metadata extraction|
+| yt-dlp | Primary transcript extraction + video metadata extraction|
 | FasterWhisper | Fallback audio transcription (lazy loaded) |
 | Pydantic | Request/response validation |
 
@@ -61,8 +61,8 @@ YouTube URL
     │
     ├─► TranscriptService.extract_video_id()      # regex extraction
     │         │
-    │         ├─► yt-dlp                          # primary (captions)
-    │         └─► FasterWhisper                   # fallback (audio, lazy loaded)
+    │         ├─► yt-dlp                          # primary transcript extraction
+    │         └─► FasterWhisper                   # fallback transcript extraction
     │
     ├─► metadata_provider                         # title, author via yt-dlp
     │
@@ -87,7 +87,7 @@ User Question
     │         ├── YES → RAG flow (context + prompt → Gemini)  → from_video: true
     │         └── NO  → LLM fallback (general_prompt → Gemini) → from_video: false
     │
-    ├─► MemoryService (langchain ConversationBufferWindowMemory)                             # load chat history (last k=5 turns)
+    ├─► MemoryService (langchain ConversationBufferWindowMemory)   # load chat history (last k=5 turns)
     │
     ├─► ChatPromptTemplate
     │         system + MessagesPlaceholder + context + question
