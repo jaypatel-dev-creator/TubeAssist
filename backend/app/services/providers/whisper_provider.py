@@ -3,25 +3,26 @@ import tempfile      ## to save the audio file extracted from yt video inside OS
 from pathlib import Path
 
 # ── Lazy loading — Whisper model only loads when actually needed ──────────────
-# This prevents RAM consumption at server startup on Render free tier (512MB limit)
-# If yt-dlp captions succeed, Whisper never loads and zero RAM is consumed
+# This prevents RAM consumption at server startup on Render free tier (512MB limit) along with zero RAM consumption locally when no whisper fallback is triggered
 _model = None
 
 def _get_model():
-    global _model
+    global _model #tells python to modify the global _model variable , instead of creating a local _model variable. 
     if _model is None:
-        from faster_whisper import WhisperModel  # ← imported only when needed
-        _model = WhisperModel("base", device="cpu")
+        from faster_whisper import WhisperModel 
+        _model = WhisperModel("base", device="cpu") # we are using faster whisper base model
     return _model
 
 
+
+# download_audio() uses ytdlp to download best audio to feed to faster whisper 
 def download_audio(url: str) -> Path:
     temp_dir = Path(tempfile.gettempdir())          # getting temp directory
-    output = str(temp_dir / "temp_audio.%(ext)s")  # where to save file along with extension
+    output = str(temp_dir / "temp_audio.%(ext)s") # saving audio file in temp dir
 
     ydl_opts = {
         "format": "bestaudio/best",  # download the best audio quality
-        "outtmpl": output,           # where to save file
+        "outtmpl": output,           # location of file saving 
         "quiet": True                # dont output logs
     }
 
@@ -36,11 +37,13 @@ def download_audio(url: str) -> Path:
     return audio_files[0]
 
 
+
+# feeds that audio file from download_audio()  to FasterWhisper, joins all segments into one paragraph, deletes temp audio file.
 def get_whisper_transcript(url: str) -> str:
     audio_path = download_audio(url)  # downloading audio
 
     try:
-        segments, _ = _get_model().transcribe(str(audio_path))  # ← loads model only here
+        segments, _ = _get_model().transcribe(str(audio_path))  # loads model only here , transcribe is function from faster wihsper that generates tranascript from audio file 
         text = " ".join(segment.text for segment in segments)   # joining all extracted segments into single paragraph
         return text
 
@@ -48,4 +51,4 @@ def get_whisper_transcript(url: str) -> str:
         try:
             audio_path.unlink()  # delete temp audio file from OS temporary directory
         except Exception:
-            pass
+            pass # if any exception occurs in deleting the temp audio file, then dont throw error and crash, ignore it and move on because cleanup failure is not important to crash the whole thing 

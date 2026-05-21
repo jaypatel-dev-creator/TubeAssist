@@ -2,13 +2,13 @@ from pydantic import BaseModel
 from typing import Optional
 
 
-# ── Request ───────────────────────────────────────────────────────────────────
+# request schema 
 class ChatRequest(BaseModel):
     question: str
     video_id: Optional[str] = None
 
-
-# ── Nested schema for sources ─────────────────────────────────────────────────
+# response 
+# sources contains a list of metadata objects — each validated separately via ChunkMetadata# 
 class ChunkMetadata(BaseModel):
     video_id: str
     title: str

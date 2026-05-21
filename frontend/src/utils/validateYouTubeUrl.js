@@ -1,8 +1,3 @@
-// ─── YouTube URL Validator ────────────────────────────────────────────────────
-// Supports:
-//   https://www.youtube.com/watch?v=VIDEO_ID
-//   https://youtu.be/VIDEO_ID
-//   https://www.youtube.com/shorts/VIDEO_ID
 
 const YOUTUBE_REGEX =
   /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|shorts\/)|youtu\.be\/)[\w-]{11}([&?].*)?$/;

@@ -1,5 +1,5 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_core.documents  import Document # standard langchain document 
+from langchain_core.documents  import Document # standard langchain document format 
 
 
 class ChunkingService:
@@ -22,22 +22,11 @@ class ChunkingService:
                 "author": transcript_data["author"],
             }
         )
-        documents = self.text_splitter.split_documents([base_document]) # square bracket cause split_documents expects a list of document object 
+        documents = self.text_splitter.split_documents([base_document]) 
 
     ## adding chunk index metadata in splitted chunks 
         for i, doc in enumerate(documents):
             doc.metadata["chunk_index"] = i
         return documents 
     
-    ## finally each chunk looks like 
-#     {
-#   "page_content": "some text...",
-#   "metadata": {
-#     "video_id": "...", -> from transcriptservice 
-#     "title": "...", -> from metadata service 
-#     "author": "...", -> from metadata service 
-#     "chunk_index": 0 -> from chunking service 
-#   }
-# }
-
-
+ 

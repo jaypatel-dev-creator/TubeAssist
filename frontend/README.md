@@ -15,10 +15,10 @@ src/
 │   ├── MessageBubble.jsx    # user/AI bubbles + general knowledge badge
 │   └── StatusBar.jsx        # processing / thinking / error / success states
 ├── hooks/
-│   ├── useVideoIngest.js    # ingestion state, video_id, video_title, status error handling
+│   ├── useVideoIngest.js    # ingestion state, video_id, video_title, error handling
 │   └── useChat.js           # message history, from_video flag
 ├── api/
-│   ├── client.js            # axios base instance + interceptors
+│   ├── client.js            # plain axios instance (baseURL, timeout, Content-Type)
 │   └── tubeassist.js        # ingestVideo(), askQuestion()
 ├── utils/
 │   └── validateYouTubeUrl.js
@@ -30,14 +30,14 @@ src/
 
 ## API Integration
 
-All requests route through a single axios instance in `client.js`:
+All requests route through a single plain axios instance in `client.js`:
 
 ```js
-// Response interceptor — unwraps data, normalizes FastAPI errors
-client.interceptors.response.use(
-  (response) => response.data,
-  (error) => Promise.reject(new Error(error.response?.data?.detail || error.message))
-);
+const client = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000",
+  timeout: 180000,  // 3 min — accounts for Whisper fallback transcription
+  headers: { "Content-Type": "application/json" }
+});
 ```
 
 Two endpoints consumed:
@@ -46,6 +46,16 @@ Two endpoints consumed:
 POST /videos/ingest  → { url }               → { status, video_id, video_title }
 POST /chat/ask       → { question, video_id } → { answer, sources, from_video }
 ```
+
+---
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `VITE_API_URL` | No | `http://localhost:8000` | FastAPI backend URL |
+
+Only variables prefixed with `VITE_` are exposed to the browser by Vite. In production, set `VITE_API_URL` to your deployed Render backend URL in the Vercel dashboard — Vite bakes it into the build at deploy time.
 
 ---
 
@@ -62,14 +72,15 @@ npm run dev
 
 ## Key Implementation Notes
 
-**Status error handling** — backend returns `{ status: "error", message: "..." }` as HTTP 200 for handled failures. `useVideoIngest` explicitly checks `data.status === "error"` — preventing "Untitled Video" from appearing on failed ingestion.
+**Manual response unwrap** — `response.data` extracted manually in each hook after axios call. 
+
+**Manual error extraction** — catch blocks in both `useVideoIngest` and `useChat` extract error messages via `err.response?.data?.detail` → `err.response?.data?.message` → `err.message` fallback chain.
+
 
 **`from_video` flag** — `useChat` reads `data.from_video` from each response and stores it on the message object. `MessageBubble` renders an amber "General knowledge — not from video" badge when `fromVideo === false`.
 
 **Guard condition** — `ChatInput` disabled until `isVideoReady = !!videoTitle && !isIngesting`.
 
 **Already indexed** — `status: "already_indexed"` handled as success path with distinct status message.
-
-**Optimistic updates** — user messages appended immediately before API call resolves.
 
 **Chat reset** — `useEffect` watches `isIngesting` and calls `resetChat()` on new video load.

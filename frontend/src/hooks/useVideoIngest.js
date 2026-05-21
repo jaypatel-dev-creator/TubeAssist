@@ -1,21 +1,6 @@
 import { useState, useCallback } from "react";
 import { ingestVideo } from "../api/tubeassist";
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
-/**
- * useVideoIngest
- *
- * Handles everything related to loading a YouTube video.
- *
- * Returns:
- *   videoId      — video_id returned by backend after ingestion
- *   videoTitle   — video_title returned by backend after ingestion
- *   isIngesting  — true while backend is processing
- *   ingestStatus — "processing" | "success" | "error" | null
- *   ingestMsg    — message string for StatusBar
- *   handleIngest — call this with a YouTube URL to start ingestion
- *   reset        — clears all state (called when new video is loaded)
- */
 export default function useVideoIngest() {
   const [videoId,      setVideoId]      = useState("");
   const [videoTitle,   setVideoTitle]   = useState("");
@@ -38,16 +23,15 @@ export default function useVideoIngest() {
     setIngestMsg("Processing video…");
 
     try {
-      const data = await ingestVideo(url);
+      const response = await ingestVideo(url);
+      const data = response.data;  // manual unwrap
 
-      // backend returned a handled error (e.g. fake video, empty transcript)
       if (data.status === "error") {
         setIngestStatus("error");
         setIngestMsg(data.message || "Something went wrong.");
-        return;  // stop here — don't set videoTitle or videoId
+        return;
       }
 
-      // status: "success" or "already_indexed" — both are valid
       setVideoId(data.video_id || "");
       setVideoTitle(data.video_title || "Untitled Video");
       setIngestStatus("success");
@@ -57,10 +41,13 @@ export default function useVideoIngest() {
           : "Video ready — start asking questions!"
       );
     } catch (err) {
-      // network error, timeout, or unhandled backend exception
+      const message = err.response?.data?.detail ||
+                      err.response?.data?.message ||
+                      err.message ||
+                      "Something went wrong.";
       setVideoId("");
       setIngestStatus("error");
-      setIngestMsg(err.message || "Something went wrong.");
+      setIngestMsg(message);
     } finally {
       setIsIngesting(false);
     }

@@ -1,10 +1,15 @@
-
-backend/.env
+# Python
 backend/venv/
 backend/__pycache__/
 backend/db/
 backend/vectorstore/
 
-frontend/.env
+# Frontend
 frontend/node_modules/
 frontend/dist/
+
+# Environment variables
+.env
+.env.*
+!backend/.env.example
+!frontend/.env.example

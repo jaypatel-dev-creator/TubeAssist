@@ -4,15 +4,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes.ingest_route import router as ingest_router
 from app.routes.chat_route import router as chat_router
 
+from app.core.config import APP_ENV
 app = FastAPI() ## main application instance => everything routes, midldlweares must attach to this 
+
+
+origins = ["https://tube-assist.vercel.app"]
+
+if APP_ENV == "development":
+    origins.append("http://localhost:5173")
 
 # ── CORS must be registered BEFORE routers ──
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",           # local dev
-        "https://tube-assist.vercel.app" #deployed vercel url
-    ],
+    allow_origins=origins,
     allow_methods=["*"], ## allow get,post
     allow_headers=["*"], ## allow all headers 
 )
@@ -26,29 +30,29 @@ def root():
 def about():
     return {
         "project": "TubeAssist",
-        "description": "AI-powered assistant that allows users to ask questions about YouTube videos using Retrieval-Augmented Generation (RAG).",
+        "version": "1.0",
+        "description": "AI-powered YouTube video assistant. Paste a video URL, ask questions, and get answers grounded in the video transcript using RAG.",
         "features": [
             "YouTube caption extraction via yt-dlp",
-            "FasterWhisper fallback transcription",
-            "Recursive chunking with overlap",
-            "Gemini vector embeddings",
-            "ChromaDB vector storage with video_id metadata filtering",
-            "Conversation memory across turns",
-            "Grounded answer generation"
+            "FasterWhisper fallback transcription for videos without captions",
+            "Recursive text chunking with overlap (1000 chars / 200 overlap)",
+            "Gemini text embeddings (embedding-001, 3072 dimensions)",
+            "ChromaDB (local) and Pinecone (production) vector storage",
+            "Scoped retrieval via video_id metadata filtering",
+            "Two-stage relevance filtering — score threshold + LLM-as-a-Judge",
+            "LLM fallback to general knowledge when no relevant context found",
+            "Conversation memory across follow-up questions (last 5 turns)",
+            "Environment-based configuration — Chroma locally, Pinecone in production"
         ],
-        "tech_stack": [
-            "FastAPI",
-            "LangChain",
-            "ChromaDB",
-            "Gemini 2.5 Flash",
-            "Gemini Embeddings",
-            "FasterWhisper(Base)",
-            "yt-dlp",
-            "React (frontend)"
-        ],
-        "version": "1.0"
+        "tech_stack": {
+            "backend": ["FastAPI", "LangChain", "Gemini 2.5 Flash", "Gemini Embeddings", "ChromaDB", "Pinecone", "FasterWhisper (Base)", "yt-dlp"],
+            "frontend": ["React", "Vite", "Axios"]
+        },
+        "endpoints": {
+            "POST /videos/ingest": "Extract transcript, chunk, embed and store a YouTube video",
+            "POST /chat/ask": "Ask a question about an ingested video"
+        }
     }
-
 
 ## registering external routes 
 app.include_router(ingest_router)

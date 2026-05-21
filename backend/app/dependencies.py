@@ -1,4 +1,3 @@
- ## right now since we only  8 dependencies , so we are using a single dependency file rather than dependency folder (always try to avoid overengineering )
 
 from functools import lru_cache
 from app.services.embedding_service import EmbeddingService

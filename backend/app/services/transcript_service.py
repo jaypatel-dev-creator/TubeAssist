@@ -27,7 +27,7 @@ class TranscriptService:
     @staticmethod
     # method to get transcript from the url 
     def get_transcript(url: str) -> dict:
-         # first extract respective video id 
+         # first extract respective video id from the url passed 
         video_id = TranscriptService.extract_video_id(url)
 
         try:
@@ -46,10 +46,9 @@ class TranscriptService:
         metadata = get_video_metadata(url)
 
         return {
-            "video_id": video_id,
+            "video_id": video_id, 
             "title": metadata["title"],
             "author": metadata["author"],
             "transcript": transcript_text
         }
     # final video-id metadata comes from transcript_service, title and author comes from metadata_provider
-# so get_transcript method will return transcript along with video_id, title , author , transcript

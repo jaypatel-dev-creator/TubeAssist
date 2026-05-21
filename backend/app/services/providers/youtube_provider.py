@@ -7,14 +7,15 @@ def get_youtube_transcript(video_id:str) -> str:
     temp_dir = Path(tempfile.gettempdir())
 
     ydl_opts = {
-        'writeautomaticsub': True,#download auto generated captions 
+        'writeautomaticsub': True,#download auto generated captions
         'writesubtitles': True,# download human subtitles (if available)
         'skip_download': True,# dont download audio / video 
-        'subtitlesformat': 'vtt',# spcfify format of subtitle 
+        'subtitlesformat': 'vtt',# format of transcript file 
         'subtitleslangs': ['en'],# download only english subtitle
         'outtmpl': str(temp_dir / f'temp_{video_id}'),# subtitle file name 
         'quiet': True, # dont print logs in console 
     }
+
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download(video_id)
@@ -22,7 +23,7 @@ def get_youtube_transcript(video_id:str) -> str:
     vtt_files = list(temp_dir.glob(f'temp_{video_id}*.vtt'))
 
     if not vtt_files:
-        raise Exception("No captions found")
+        raise Exception("No captions found") # this exception will be caught in transcript_service and will trigger whisper fallback 
 
     with open(vtt_files[0], 'r', encoding='utf-8') as f:
         raw = f.read()
@@ -30,6 +31,7 @@ def get_youtube_transcript(video_id:str) -> str:
     vtt_files[0].unlink()  # delete temp subtitle file 
     return _parse_vtt(raw) # return cleaned subtitles 
 
+# cleaning function for vtt file 
 def _parse_vtt(vtt_text: str) -> str:
     lines = vtt_text.split('\n')
     text_lines = []

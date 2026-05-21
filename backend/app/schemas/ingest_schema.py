@@ -1,12 +1,11 @@
 from pydantic import BaseModel
 
 
-# ── Request ───────────────────────────────────────────────────────────────────
+# request schema 
 class VideoIngestRequest(BaseModel):
     url: str
 
-
-# ── Response variants ─────────────────────────────────────────────────────────
+##response bodies 
 class VideoIngestSuccess(BaseModel):
     status: str        # "success"
     video_id: str
@@ -25,3 +24,4 @@ class VideoAlreadyIndexed(BaseModel):
 class VideoIngestError(BaseModel):
     status: str        # "error"
     message: str
+    # since ingestion serevice returns 3 different response bodies, so response bodies wont be implemented for ingest_route. 

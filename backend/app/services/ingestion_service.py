@@ -5,6 +5,7 @@ from app.services.vector_store_service import VectorStoreService
 
 
 class IngestionService:
+    
 
     def __init__(
         self,
@@ -21,14 +22,16 @@ class IngestionService:
         try:
             transcript_data = self.transcript_service.get_transcript(url)
         except Exception as e:
+            # error thrown  and returned to client when extracting transcript failed from both ytdlp and whisper. 
             return {
                 "status": "error",
                 "message": "Could not fetch transcript. Check if the video exists and is public." 
             }
+        
      # Prevent duplicate ingestion
         video_id = transcript_data["video_id"]
         if self.vector_store_service.video_exists(video_id):
-            return {  ## returned in API respones after user enter already existed video url 
+            return {  ## returned to client  after user enter already existed video url 
                 "status": "already_indexed",
                 "video_id": video_id,
                 "video_title": transcript_data["title"],
@@ -37,7 +40,7 @@ class IngestionService:
    # Phase 2: Chunking
         documents = self.chunking_service.create_chunks(transcript_data)
 
-   #         # Phase 3 + 4: embedding + storing in ChromaDB
+   # Phase 3 + 4: embedding + storing in ChromaDB
         if not documents:
             return {
                 "status": "error",
@@ -46,7 +49,7 @@ class IngestionService:
 
         self.vector_store_service.add_documents(documents)
 
-        # returned in API response after user hits ingest_route (when user posts any video url)
+        # returned to client after successfull ingestion of video. 
         return {
             "status": "success",
             "video_id": video_id,
