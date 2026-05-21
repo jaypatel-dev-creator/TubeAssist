@@ -2,18 +2,20 @@ services:
   - type: web
     name: tubeassist-backend
     runtime: python
-    rootDir: backend ## tell render to look inside backend folder 
+    rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT ## $PORT=>  render will assign port dynamically 
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     plan: free
     envVars:
+      - key: APP_ENV
+        value: production
       - key: GEMINI_API_KEY
-        sync: false ## render will prompt you to enter the env secret keys in Render Dashboard .
+        sync: false
       - key: VECTOR_STORE
         value: pinecone
       - key: PINECONE_API_KEY
-        sync: false ## ths too must be entered in render dashboard
+        sync: false
       - key: PINECONE_INDEX
-        value: tubeassist ## no need to enter in render dashboard
+        value: tubeassist
       - key: PYTHON_VERSION
-        value: 3.12.0   ## no need to enter 
+        value: 3.12.0
