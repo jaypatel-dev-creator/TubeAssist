@@ -197,44 +197,62 @@ npm run dev
 ```
 
 ---
-
 ## Environment Variables
 
-### `backend/.env`
+### `backend/.env` (local only — never committed)
+
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `APP_ENV` | No | `development` | `development` or `production` |
+| `APP_ENV` | No | `development` | controls which `.env` file loads — local use only |
 | `GEMINI_API_KEY` | Yes | — | Google Gemini API key |
-| `VECTOR_STORE` | No | `chroma` | `chroma` (local) or `pinecone` (production) |
+| `VECTOR_STORE` | No | `chroma` | `chroma` locally, `pinecone` in production |
 | `PINECONE_API_KEY` | Pinecone only | — | Pinecone API key |
 | `PINECONE_INDEX` | Pinecone only | `tubeassist` | Pinecone index name |
 
-### `frontend/.env`
+### `frontend/.env` (local only — never committed)
+
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `VITE_API_URL` | No | `http://localhost:8000` | FastAPI backend URL |
+| `VITE_API_URL` | No| `http://localhost:8000` | FastAPI backend URL |
 
 ---
 
 ## Environment-Based Configuration
 
-`config.py` reads `APP_ENV` before loading any file. Separate `.env` files per environment — no commented-out config blocks, no hardcoded values.
+Three scenarios, same codebase, zero code changes:
 
-| Scenario | How |
-|---|---|
-| Local dev | `uvicorn app.main:app --reload` — defaults to `development`, loads `.env` |
-| Simulate prod locally | `APP_ENV=production uvicorn app.main:app --reload` — loads `.env.production` |
-| Render (actual prod) | All vars set in Render dashboard — `load_dotenv` is a no-op |
+**Local dev** — just run normally, no setup needed:
+```bash
+uvicorn app.main:app --reload
+# APP_ENV defaults to "development" → loads .env → uses ChromaDB
+```
+
+**Simulate production locally** — prefix with `APP_ENV=production`:
+```bash
+APP_ENV=production uvicorn app.main:app --reload
+# loads .env.production → uses Pinecone
+```
+
+**Actual production (Render)** — set all vars directly in Render dashboard:
+```
+APP_ENV=production
+GEMINI_API_KEY=your_key
+VECTOR_STORE=pinecone
+PINECONE_API_KEY=your_key
+PINECONE_INDEX=tubeassist
+```
+
+No `.env` files on Render — Render injects vars directly. `load_dotenv` runs but does nothing.
 
 ---
 
 ## Deployment
 
-**Backend** — Render. Set all production env vars in Render dashboard (see table above). Uses Pinecone as vector store — ChromaDB is unsuitable for production due to Render's ephemeral disk.
+**Backend → Render**
+Push to GitHub → Render auto-deploys via `render.yaml`. Set `GEMINI_API_KEY` and `PINECONE_API_KEY` manually in Render dashboard (secrets). Everything else is handled by `render.yaml`.
 
-**Frontend** — Vercel. Set `VITE_API_URL` to your Render backend URL in Vercel's environment variables dashboard. Vite bakes it into the bundle at build time.
-
----
+**Frontend → Vercel**
+Connect GitHub repo to Vercel. Set `VITE_API_URL=https://your-render-url.com` in Vercel dashboard → Environment Variables. Vite bakes it into the bundle at deploy time.
 
 
 

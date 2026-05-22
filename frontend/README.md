@@ -49,16 +49,6 @@ POST /chat/ask       → { question, video_id } → { answer, sources, from_vide
 
 ---
 
-## Environment Variables
-
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `VITE_API_URL` | No | `http://localhost:8000` | FastAPI backend URL |
-
-Only variables prefixed with `VITE_` are exposed to the browser by Vite. In production, set `VITE_API_URL` to your deployed Render backend URL in the Vercel dashboard — Vite bakes it into the build at deploy time.
-
----
-
 ## Setup
 
 ```bash

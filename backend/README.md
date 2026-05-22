@@ -218,17 +218,7 @@ APP_ENV=production uvicorn app.main:app --reload
 
 ---
 
-## Environment Variables
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `APP_ENV` | No | `development` | `development` or `production` |
-| `GEMINI_API_KEY` | Yes | — | Google Gemini API key for LLM + embeddings |
-| `VECTOR_STORE` | No | `chroma` | `chroma` (local) or `pinecone` (production) |
-| `PINECONE_API_KEY` | Pinecone only | — | Pinecone API key |
-| `PINECONE_INDEX` | Pinecone only | `tubeassist` | Pinecone index name |
-
----
 
 ## Testing
 
