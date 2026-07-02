@@ -14,6 +14,10 @@
 
 ---
 
+
+![TubeAssist Demo](assets/demo.gif)
+
+---
 ## What is TubeAssist?
 
 TubeAssist lets you paste any YouTube URL and instantly start asking questions about the video — powered by a full RAG pipeline. The system fetches the video transcript via yt-dlp (with FasterWhisper as fallback), chunks it recursively, converts chunks into vector embeddings using Gemini Embeddings, stores them in ChromaDB (locally) or Pinecone (production), and retrieves the most relevant context to answer your questions using Gemini 2.5 Flash.
@@ -53,9 +57,9 @@ YouTube URL
 │                   video_id filter)       │
 │                          │               │
 │              Stage 1 — Score filter      │
-│              Stage 2 — LLM-as-a-Judge   │
+│              Stage 2 — LLM-as-a-Judge    │
 │                  ├── relevant → RAG      │
-│                  └── irrelevant → LLM   │
+│                  └── irrelevant → LLM    │
 │                          fallback        │
 │                          │               │
 │                          ▼               │
@@ -270,18 +274,23 @@ Connect GitHub repo to Vercel. Set `VITE_API_URL=https://your-render-url.com` in
 
 ---
 
-## Limitations
+## ⚠️ Known Limitations & Infrastructure Notes
 
-- Conversation memory is in-RAM only — not persistent across server restarts
-- No user session isolation — single shared memory instance per server process
-- Whisper fallback is slow on CPU (~2-4 min for a 5 min video)
+### YouTube Transcript Fetch — Render Deployment
+**Status:** Blocked in production  
+**Root cause:** Render runs on AWS datacenter IPs. YouTube blanket-blocks 
+datacenter IP ranges for yt-dlp requests — including the Whisper audio 
+fallback, which also uses yt-dlp for audio download. Residential IPs work 
+fine; the issue is *who* makes the request, not the code itself.  
+**Verified locally:** Both transcript fetch and Whisper fallback work 
+perfectly on local/residential IPs.  
+**Production fix:** Paid transcript API (Supadata, RapidAPI) or residential 
+proxy service. Documented as a known infrastructure limitation.
 
+### Cold Start
+Backend deployed on Render free tier — expect 50–60 second cold start 
+after inactivity.
 ---
 
-## Future Improvements
-
-- Session-based persistent memory (Redis)
-- Multi-user support with isolated memory per session
-- Streaming responses
-- Advanced RAG techniques (HyDE, re-ranking, MMR)
-- RAG evaluation metrics (faithfulness, relevance, context recall)
+## Roadmap
+Session-based memory (Redis) and streaming responses planned for v2.
