@@ -1,25 +1,55 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.config import APP_ENV
 from app.routes.ingest_route import router as ingest_router
 from app.routes.chat_route import router as chat_router
+from app.services.embedding_service import init_embedding_model
+from app.services.vector_store_service import init_vector_store
+from app.services.rag_service import init_rag_service
 
-from app.core.config import APP_ENV
-app = FastAPI() ## main application instance => everything routes, midldlweares must attach to this 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ── Startup ────────────────────────────────────────────────────────────────
+    init_embedding_model()
+    init_vector_store()
+    init_rag_service()
+    yield
+    # ── Shutdown ───────────────────────────────────────────────────────────────
 
 
-origins = ["https://tube-assist.vercel.app"]
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title="TubeAssist",
+        description="AI-powered YouTube video assistant",
+        version="1.0.0",
+        docs_url="/docs" if APP_ENV == "development" else None,
+        redoc_url=None,
+        lifespan=lifespan,
+    )
 
-if APP_ENV == "development":
-    origins.append("http://localhost:5173")
+    origins = ["https://tube-assist.vercel.app"]
+    if APP_ENV == "development":
+        origins.append("http://localhost:5173")
 
-# ── CORS must be registered BEFORE routers ──
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_methods=["*"], ## allow get,post
-    allow_headers=["*"], ## allow all headers 
-)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    app.include_router(ingest_router)
+    app.include_router(chat_router)
+
+    return app
+
+
+app = create_app()
+
 
 @app.get("/")
 def root():
@@ -53,7 +83,3 @@ def about():
             "POST /chat/ask": "Ask a question about an ingested video"
         }
     }
-
-## registering external routes 
-app.include_router(ingest_router)
-app.include_router(chat_router)

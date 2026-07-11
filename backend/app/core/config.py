@@ -1,14 +1,27 @@
-import os
-from dotenv import load_dotenv
+from functools import lru_cache
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-APP_ENV = os.getenv("APP_ENV", "development")
 
-if APP_ENV == "production":
-    load_dotenv(".env.production")
-else:
-    load_dotenv(".env")
+class Settings(BaseSettings):
+    # Gemini
+    gemini_api_key: str
 
-GEMINI_API_KEY   = os.getenv("GEMINI_API_KEY")
-VECTOR_STORE     = os.getenv("VECTOR_STORE", "chroma")
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_INDEX   = os.getenv("PINECONE_INDEX", "tubeassist")
+    # App
+    app_env: str = "development"
+
+    # Vector store
+    vector_store: str = "chroma"
+    pinecone_api_key: str = ""
+    pinecone_index: str = "tubeassist"
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+
+@lru_cache()
+def get_settings() -> Settings:
+    return Settings()

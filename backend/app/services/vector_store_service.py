@@ -1,87 +1,87 @@
-
 from pathlib import Path
 from app.core.config import VECTOR_STORE, PINECONE_API_KEY, PINECONE_INDEX
-from app.services.embedding_service import EmbeddingService
+from app.services.embedding_service import get_embedding_model
 
 
-class VectorStoreService:
-    
+def _init_chroma():
+    from langchain_chroma import Chroma
 
-    def __init__(self, embedding_service: EmbeddingService):
-        self.embedding_function = embedding_service.get_embedding_model()
-        self.store_type = VECTOR_STORE  # "chroma" or "pinecone"
+    BASE_DIR = Path(__file__).resolve().parent.parent
+    persist_directory = BASE_DIR / "db" / "chroma"
+    persist_directory.mkdir(parents=True, exist_ok=True)
 
-        if self.store_type == "pinecone":
-            self.vector_store = self._init_pinecone()
-        else:
-            self.vector_store = self._init_chroma()
+    return Chroma(
+        collection_name="tube_assist",
+        embedding_function=get_embedding_model(),
+        persist_directory=str(persist_directory),
+    )
 
-    # ── Chroma (local) ────────────────────────────────────────────────────────
-    def _init_chroma(self):
-        from langchain_chroma import Chroma
 
-        BASE_DIR = Path(__file__).resolve().parent.parent
-        persist_directory = BASE_DIR / "db" / "chroma"# folder where embeddings will be stored  locally 
-        persist_directory.mkdir(parents=True, exist_ok=True) ## create embedding storage folder if not exists, if already exists then no error 
+def _init_pinecone():
+    from pinecone import Pinecone, ServerlessSpec
+    from langchain_pinecone import PineconeVectorStore
 
-        return Chroma(
-            collection_name="tube_assist",
-            embedding_function=self.embedding_function,  ## due to this function, chroma will automatically embed transcript  on insert and  user query during similarity search
-            persist_directory=str(persist_directory),    # chroma expects string path
-        )
+    pc = Pinecone(api_key=PINECONE_API_KEY)
 
-    # ── Pinecone (production) ─────────────────────────────────────────────────
-    def _init_pinecone(self):
-        from pinecone import Pinecone, ServerlessSpec
-        from langchain_pinecone import PineconeVectorStore
-
-        pc = Pinecone(api_key=PINECONE_API_KEY) #authenticating with pinecone 
-
-        # create index if it doesn't exist
-        existing_indexes = [i.name for i in pc.list_indexes()]
-        if PINECONE_INDEX not in existing_indexes:
-            pc.create_index(
-                name=PINECONE_INDEX,
-                dimension=3072,       # Gemini embedding-001 default dimension
-                metric="cosine",
-                spec=ServerlessSpec(
-                    cloud="aws",
-                    region="us-east-1" ## database is being hosted on aws US east 1 
-                )
+    existing_indexes = [i.name for i in pc.list_indexes()]
+    if PINECONE_INDEX not in existing_indexes:
+        pc.create_index(
+            name=PINECONE_INDEX,
+            dimension=3072,
+            metric="cosine",
+            spec=ServerlessSpec(
+                cloud="aws",
+                region="us-east-1"
             )
-         
-        return PineconeVectorStore(
-            index_name=PINECONE_INDEX,
-            embedding=self.embedding_function,### due to this function, chroma will automatically embed transcript  on insert and  user query during similarity search
-            pinecone_api_key=PINECONE_API_KEY
         )
 
- 
-    def get_vector_store(self): # returns raw vector_store object  (used in retriever_service )
-        return self.vector_store
+    return PineconeVectorStore(
+        index_name=PINECONE_INDEX,
+        embedding=get_embedding_model(),
+        pinecone_api_key=PINECONE_API_KEY
+    )
 
-    def add_documents(self, documents):  # adds document in store (used in ingestion_service)
-        self.vector_store.add_documents(documents) # add_documents is langchain method to add documents to any vector store, so not need to create a separate method to add documents 
+
+# ── Singleton ──────────────────────────────────────────────────────────────────
+_vector_store = None
 
 
-    def video_exists(self, video_id: str) -> bool:  ## checks  whether the video is already stored in database  (used in ingestionservice )
-        if self.store_type == "pinecone":
-            return self._video_exists_pinecone(video_id)
-        return self._video_exists_chroma(video_id)
-    
-# private method to check for duplicate video in chroma 
-    def _video_exists_chroma(self, video_id: str) -> bool: 
-        results = self.vector_store.get( 
-            where={"video_id": video_id}, limit=1 
-        )
-        return bool(results["ids"])
-# private method to check for duplicate video in pinecone 
+def get_vector_store():
+    if _vector_store is None:
+        raise RuntimeError("Vector store not initialized. Call init_services() on startup.")
+    return _vector_store
 
-    def _video_exists_pinecone(self, video_id: str) -> bool: 
-        results = self.vector_store.similarity_search(
-            query="exists", 
-            k=1, 
-            filter={"video_id": video_id} 
-        )
-        return bool(results)
-    
+
+def init_vector_store() -> None:
+    global _vector_store
+    if VECTOR_STORE == "pinecone":
+        _vector_store = _init_pinecone()
+    else:
+        _vector_store = _init_chroma()
+
+
+# ── Public API (called by ingestion_service and retriever_service) ─────────────
+def add_documents(documents) -> None:
+    get_vector_store().add_documents(documents)
+
+
+def video_exists(video_id: str) -> bool:
+    if VECTOR_STORE == "pinecone":
+        return _video_exists_pinecone(video_id)
+    return _video_exists_chroma(video_id)
+
+
+def _video_exists_chroma(video_id: str) -> bool:
+    results = get_vector_store().get(
+        where={"video_id": video_id}, limit=1
+    )
+    return bool(results["ids"])
+
+
+def _video_exists_pinecone(video_id: str) -> bool:
+    results = get_vector_store().similarity_search(
+        query="exists",
+        k=1,
+        filter={"video_id": video_id}
+    )
+    return bool(results)
