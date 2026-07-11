@@ -1,4 +1,4 @@
-from app.core.config import VECTOR_STORE
+from app.core.config import get_settings
 from app.services.vector_store_service import get_vector_store
 
 
@@ -15,7 +15,7 @@ def retrieve_with_scores(query: str, k: int = 6, video_id: str | None = None) ->
         )
 
     # normalize Pinecone cosine similarity to cosine distance
-    if VECTOR_STORE == "pinecone":
+    if get_settings().vector_store == "pinecone":
         results = [(doc, 1 - score) for doc, score in results]
 
     return results

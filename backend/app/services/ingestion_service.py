@@ -1,38 +1,26 @@
 from app.services.transcript_service import get_transcript
 from app.services.chunking_service import create_chunks
 from app.services.vector_store_service import video_exists, add_documents
+from app.core.exceptions import VideoAlreadyIndexedException, EmptyTranscriptException
 
 
 def ingest_video(url: str) -> dict:
     # Phase 1: Fetch transcript + metadata
-    try:
-        transcript_data = get_transcript(url)
-    except Exception:
-        return {
-            "status": "error",
-            "message": "Could not fetch transcript. Check if the video exists and is public."
-        }
+    # InvalidURLException / TranscriptFetchException propagate up from transcript_service
+    transcript_data = get_transcript(url)
 
-    # Prevent duplicate ingestion
+    # Phase 2: Duplicate check
     video_id = transcript_data["video_id"]
     if video_exists(video_id):
-        return {
-            "status": "already_indexed",
-            "video_id": video_id,
-            "video_title": transcript_data["title"],
-            "video_author": transcript_data["author"]
-        }
+        raise VideoAlreadyIndexedException(video_id)
 
-    # Phase 2: Chunking
+    # Phase 3: Chunking
     documents = create_chunks(transcript_data)
 
-    # Phase 3 + 4: Embed + store
     if not documents:
-        return {
-            "status": "error",
-            "message": "Transcript was empty — could not create chunks."
-        }
+        raise EmptyTranscriptException()
 
+    # Phase 4: Embed + store
     add_documents(documents)
 
     return {

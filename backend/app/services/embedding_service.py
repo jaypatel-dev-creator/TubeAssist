@@ -1,5 +1,5 @@
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from app.core.config import GEMINI_API_KEY
+from app.core.config import get_settings
 
 
 # ── Singleton ──────────────────────────────────────────────────────────────────
@@ -16,6 +16,6 @@ def init_embedding_model() -> None:
     global _embeddings
     _embeddings = GoogleGenerativeAIEmbeddings(
         model="models/gemini-embedding-001",
-        google_api_key=GEMINI_API_KEY,
+        google_api_key=get_settings().gemini_api_key,
         task_type="retrieval_document"
     )

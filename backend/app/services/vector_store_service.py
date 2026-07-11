@@ -1,6 +1,7 @@
 from pathlib import Path
-from app.core.config import VECTOR_STORE, PINECONE_API_KEY, PINECONE_INDEX
+from app.core.config import get_settings
 from app.services.embedding_service import get_embedding_model
+from app.core.exceptions import VectorStoreException
 
 
 def _init_chroma():
@@ -21,12 +22,13 @@ def _init_pinecone():
     from pinecone import Pinecone, ServerlessSpec
     from langchain_pinecone import PineconeVectorStore
 
-    pc = Pinecone(api_key=PINECONE_API_KEY)
+    settings = get_settings()
+    pc = Pinecone(api_key=settings.pinecone_api_key)
 
     existing_indexes = [i.name for i in pc.list_indexes()]
-    if PINECONE_INDEX not in existing_indexes:
+    if settings.pinecone_index not in existing_indexes:
         pc.create_index(
-            name=PINECONE_INDEX,
+            name=settings.pinecone_index,
             dimension=3072,
             metric="cosine",
             spec=ServerlessSpec(
@@ -36,9 +38,9 @@ def _init_pinecone():
         )
 
     return PineconeVectorStore(
-        index_name=PINECONE_INDEX,
+        index_name=settings.pinecone_index,
         embedding=get_embedding_model(),
-        pinecone_api_key=PINECONE_API_KEY
+        pinecone_api_key=settings.pinecone_api_key
     )
 
 
@@ -54,7 +56,7 @@ def get_vector_store():
 
 def init_vector_store() -> None:
     global _vector_store
-    if VECTOR_STORE == "pinecone":
+    if get_settings().vector_store == "pinecone":
         _vector_store = _init_pinecone()
     else:
         _vector_store = _init_chroma()
@@ -62,13 +64,19 @@ def init_vector_store() -> None:
 
 # ── Public API (called by ingestion_service and retriever_service) ─────────────
 def add_documents(documents) -> None:
-    get_vector_store().add_documents(documents)
+    try:
+        get_vector_store().add_documents(documents)
+    except Exception as e:
+        raise VectorStoreException(f"Failed to store documents: {str(e)}")
 
 
 def video_exists(video_id: str) -> bool:
-    if VECTOR_STORE == "pinecone":
-        return _video_exists_pinecone(video_id)
-    return _video_exists_chroma(video_id)
+    try:
+        if get_settings().vector_store == "pinecone":
+            return _video_exists_pinecone(video_id)
+        return _video_exists_chroma(video_id)
+    except Exception as e:
+        raise VectorStoreException(f"Failed to check video existence: {str(e)}")
 
 
 def _video_exists_chroma(video_id: str) -> bool:

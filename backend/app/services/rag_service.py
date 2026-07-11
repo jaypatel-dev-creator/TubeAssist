@@ -3,7 +3,8 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_classic.memory import ConversationBufferWindowMemory
 
 from app.services.retriever_service import retrieve_with_scores
-from app.core.config import GEMINI_API_KEY
+from app.core.config import get_settings
+from app.core.exceptions import RAGException
 
 
 THRESHOLD = 0.7
@@ -25,7 +26,7 @@ def init_rag_service() -> None:
 
     _llm = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash",
-        google_api_key=GEMINI_API_KEY,
+        google_api_key=get_settings().gemini_api_key,
         temperature=0.3
     )
 
@@ -60,41 +61,49 @@ def _build_memory() -> ConversationBufferWindowMemory:
 
 
 def _llm_fallback(question: str, chat_history: list, memory: ConversationBufferWindowMemory) -> dict:
-    messages = _general_prompt.format_messages(
-        chat_history=chat_history,
-        question=question
-    )
-    response = get_llm().invoke(messages)
-    memory.save_context({"input": question}, {"output": response.content})
-    return {"answer": response.content, "sources": [], "from_video": False}
+    try:
+        messages = _general_prompt.format_messages(
+            chat_history=chat_history,
+            question=question
+        )
+        response = get_llm().invoke(messages)
+        memory.save_context({"input": question}, {"output": response.content})
+        return {"answer": response.content, "sources": [], "from_video": False}
+    except Exception as e:
+        raise RAGException(f"Fallback LLM call failed: {str(e)}")
 
 
 def ask(question: str, video_id: str | None = None) -> dict:
-    memory = _build_memory()
-    chat_history = memory.load_memory_variables({})["chat_history"]
+    try:
+        memory = _build_memory()
+        chat_history = memory.load_memory_variables({})["chat_history"]
 
-    docs_with_scores = retrieve_with_scores(query=question, video_id=video_id)
-    relevant_docs = [doc for doc, score in docs_with_scores if score < THRESHOLD]
+        docs_with_scores = retrieve_with_scores(query=question, video_id=video_id)
+        relevant_docs = [doc for doc, score in docs_with_scores if score < THRESHOLD]
 
-    # Stage 1 — score filter
-    if not relevant_docs:
-        return _llm_fallback(question, chat_history, memory)
+        # Stage 1 — score filter
+        if not relevant_docs:
+            return _llm_fallback(question, chat_history, memory)
 
-    context = "\n\n".join(doc.page_content for doc in relevant_docs)
-    messages = _prompt.format_messages(
-        chat_history=chat_history,
-        context=context,
-        question=question
-    )
-    response = get_llm().invoke(messages)
+        context = "\n\n".join(doc.page_content for doc in relevant_docs)
+        messages = _prompt.format_messages(
+            chat_history=chat_history,
+            context=context,
+            question=question
+        )
+        response = get_llm().invoke(messages)
 
-    # Stage 2 — LLM-as-a-Judge
-    if response.content.strip() == "NO_RELEVANT_CONTEXT":
-        return _llm_fallback(question, chat_history, memory)
+        # Stage 2 — LLM-as-a-Judge
+        if response.content.strip() == "NO_RELEVANT_CONTEXT":
+            return _llm_fallback(question, chat_history, memory)
 
-    memory.save_context({"input": question}, {"output": response.content})
-    return {
-        "answer": response.content,
-        "sources": [doc.metadata for doc in relevant_docs],
-        "from_video": True
-    }
+        memory.save_context({"input": question}, {"output": response.content})
+        return {
+            "answer": response.content,
+            "sources": [doc.metadata for doc in relevant_docs],
+            "from_video": True
+        }
+    except RAGException:
+        raise
+    except Exception as e:
+        raise RAGException(f"Failed to generate answer: {str(e)}")

@@ -1,8 +1,7 @@
 # Python
 backend/venv/
-backend/__pycache__/
-backend/db/
-backend/vectorstore/
+**/__pycache__/
+backend/app/db/
 
 # Frontend
 frontend/node_modules/
@@ -13,3 +12,6 @@ frontend/dist/
 .env.*
 !backend/.env.example
 !frontend/.env.example
+
+# Local testing
+backend/app/services/test.txt

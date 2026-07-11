@@ -14,10 +14,10 @@
 
 ---
 
-
 ![TubeAssist Demo](assets/demo.gif)
 
 ---
+
 ## What is TubeAssist?
 
 TubeAssist lets you paste any YouTube URL and instantly start asking questions about the video — powered by a full RAG pipeline. The system fetches the video transcript via yt-dlp (with FasterWhisper as fallback), chunks it recursively, converts chunks into vector embeddings using Gemini Embeddings, stores them in ChromaDB (locally) or Pinecone (production), and retrieves the most relevant context to answer your questions using Gemini 2.5 Flash.
@@ -35,16 +35,16 @@ YouTube URL
 ┌──────────────────────────────────────────┐
 │           INGESTION PIPELINE             │
 │                                          │
-│  TranscriptService → ChunkingService     │
+│  transcript_service → chunking_service   │
 │  (yt-dlp primary,    (RecursiveCharacter │
 │   Whisper fallback)   TextSplitter)      │
 │                          │               │
 │                          ▼               │
-│                 EmbeddingService         │
+│                 embedding_service        │
 │                 (Gemini Embeddings)      │
 │                          │               │
 │                          ▼               │
-│                 VectorStoreService       │
+│                 vector_store_service     │
 │                 (ChromaDB / Pinecone)    │
 └──────────────────────────────────────────┘
      │
@@ -52,7 +52,7 @@ YouTube URL
 ┌──────────────────────────────────────────┐
 │           RAG QUERY PIPELINE             │
 │                                          │
-│  User Question → RetrieverService        │
+│  User Question → retriever_service       │
 │                  (similarity search,     │
 │                   video_id filter)       │
 │                          │               │
@@ -63,7 +63,7 @@ YouTube URL
 │                          fallback        │
 │                          │               │
 │                          ▼               │
-│                  RAGService              │
+│                  rag_service             │
 │                  (context + memory       │
 │                   + Gemini 2.5 Flash)    │
 └──────────────────────────────────────────┘
@@ -105,70 +105,13 @@ Both stages route to the same `_llm_fallback()` — answering from general knowl
 | Gemini Embeddings | Text → vector conversion (3072 dimensions) |
 | yt-dlp | Primary transcript + metadata extraction |
 | FasterWhisper (base) | Fallback audio transcription (lazy loaded) |
-| Pydantic | Request/response validation |
+| Pydantic + pydantic-settings | Request/response validation + config management |
 
 ### Frontend
 | Technology | Role |
 |---|---|
 | React 18 + Vite | UI framework + build tool |
 | Axios | HTTP client |
-
----
-
-## Project Structure
-
-```
-tubeassist/
-├── backend/
-│   ├── app/
-│   │   ├── core/
-│   │   │   └── config.py                  # environment-based config (dev/prod switching)
-│   │   ├── db/
-│   │   │   └── chroma/                    # ChromaDB persistent storage
-│   │   ├── routes/
-│   │   │   ├── ingest_route.py            # POST /videos/ingest
-│   │   │   └── chat_route.py              # POST /chat/ask
-│   │   ├── services/
-│   │   │   ├── providers/
-│   │   │   │   ├── youtube_provider.py    # yt-dlp caption extraction
-│   │   │   │   ├── whisper_provider.py    # FasterWhisper fallback (lazy loaded)
-│   │   │   │   └── metadata_provider.py   # video title, author via yt-dlp
-│   │   │   ├── transcript_service.py      # transcript orchestration
-│   │   │   ├── chunking_service.py        # RecursiveCharacterTextSplitter
-│   │   │   ├── embedding_service.py       # Gemini embeddings
-│   │   │   ├── vector_store_service.py    # ChromaDB / Pinecone switching
-│   │   │   ├── retriever_service.py       # similarity search + score normalization
-│   │   │   ├── memory_service.py          # ConversationBufferWindowMemory
-│   │   │   ├── ingestion_service.py       # ingestion orchestrator
-│   │   │   └── rag_service.py             # RAG + LLM fallback orchestrator
-│   │   ├── dependencies.py                # DI wiring (singletons + request-scoped)
-│   │   └── main.py                        # FastAPI app + environment-based CORS
-│   ├── .env.example
-│   ├── .env.production                    # local production simulation only (gitignored)
-│   ├── render.yaml
-│   └── requirements.txt
-│
-└── frontend/
-    ├── src/
-    │   ├── components/
-    │   │   ├── VideoInput.jsx             # URL input + validation
-    │   │   ├── ChatWindow.jsx             # scrollable message list
-    │   │   ├── ChatInput.jsx              # auto-resize textarea
-    │   │   ├── MessageBubble.jsx          # user/AI bubble + general knowledge badge
-    │   │   └── StatusBar.jsx              # processing/thinking/error/success states
-    │   ├── hooks/
-    │   │   ├── useVideoIngest.js          # ingestion state + error handling
-    │   │   └── useChat.js                 # chat state + from_video flag
-    │   ├── api/
-    │   │   ├── client.js                  # plain axios instance (baseURL, timeout)
-    │   │   └── tubeassist.js              # ingestVideo(), askQuestion()
-    │   ├── utils/
-    │   │   └── validateYouTubeUrl.js      # URL regex validation
-    │   ├── App.jsx
-    │   └── index.css
-    ├── .env.example
-    └── package.json
-```
 
 ---
 
@@ -201,14 +144,15 @@ npm run dev
 ```
 
 ---
+
 ## Environment Variables
 
 ### `backend/.env` (local only — never committed)
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `APP_ENV` | No | `development` | controls which `.env` file loads — local use only |
 | `GEMINI_API_KEY` | Yes | — | Google Gemini API key |
+| `APP_ENV` | No | `development` | controls Swagger UI visibility and CORS origins |
 | `VECTOR_STORE` | No | `chroma` | `chroma` locally, `pinecone` in production |
 | `PINECONE_API_KEY` | Pinecone only | — | Pinecone API key |
 | `PINECONE_INDEX` | Pinecone only | `tubeassist` | Pinecone index name |
@@ -217,36 +161,29 @@ npm run dev
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `VITE_API_URL` | No| `http://localhost:8000` | FastAPI backend URL |
+| `VITE_API_URL` | No | `http://localhost:8000` | FastAPI backend URL |
 
 ---
 
-## Environment-Based Configuration
+## Configuration
 
-Three scenarios, same codebase, zero code changes:
+Config is managed via `pydantic-settings` `BaseSettings` — validated at startup, not scattered `os.getenv()` calls. If `GEMINI_API_KEY` is missing, the server refuses to start with a clear validation error rather than failing silently mid-request.
 
-**Local dev** — just run normally, no setup needed:
+**Local dev:**
 ```bash
 uvicorn app.main:app --reload
-# APP_ENV defaults to "development" → loads .env → uses ChromaDB
+# reads .env → uses ChromaDB → Swagger UI at /docs
 ```
 
-**Simulate production locally** — prefix with `APP_ENV=production`:
-```bash
-APP_ENV=production uvicorn app.main:app --reload
-# loads .env.production → uses Pinecone
+**Production (Render):**
+Set all vars directly in Render dashboard — no `.env` files needed. `pydantic-settings` reads from environment directly.
 ```
-
-**Actual production (Render)** — set all vars directly in Render dashboard:
-```
-APP_ENV=production
 GEMINI_API_KEY=your_key
+APP_ENV=production
 VECTOR_STORE=pinecone
 PINECONE_API_KEY=your_key
 PINECONE_INDEX=tubeassist
 ```
-
-No `.env` files on Render — Render injects vars directly. `load_dotenv` runs but does nothing.
 
 ---
 
@@ -258,11 +195,13 @@ Push to GitHub → Render auto-deploys via `render.yaml`. Set `GEMINI_API_KEY` a
 **Frontend → Vercel**
 Connect GitHub repo to Vercel. Set `VITE_API_URL=https://your-render-url.com` in Vercel dashboard → Environment Variables. Vite bakes it into the bundle at deploy time.
 
-
-
-
+---
 
 ## Key Design Decisions
+
+**Why module-level singletons over FastAPI DI?** FastAPI's `Depends()` chain was designed for per-request resources like DB sessions — not for wiring service graphs. Expensive objects (LLM client, embedding model, vector store) are initialized once in `lifespan()` as module-level singletons and accessed directly. `Depends()` has no role in this codebase because there are no per-request resources to inject.
+
+**Why typed exceptions over return dicts?** The original design returned `{"status": "error", ...}` with HTTP 200 — meaning API clients couldn't use status codes to detect failures. A typed exception hierarchy (`TubeAssistException` subclasses) with global handlers ensures every error maps to the correct HTTP status code (422, 409, 500) with a consistent `{"error": "..."}` response shape.
 
 **Why two-stage filtering over one?** Score filter alone can't detect semantic irrelevance — a chunk can be mathematically close but contextually wrong. LLM judge alone without pre-filtering wastes tokens on garbage chunks. Together: Stage 1 narrows candidates cheaply, Stage 2 makes the final semantic call.
 
@@ -278,18 +217,18 @@ Connect GitHub repo to Vercel. Set `VITE_API_URL=https://your-render-url.com` in
 
 ### YouTube Transcript Fetch — Render Deployment
 **Status:** Blocked in production  
-**Root cause:** Render runs on AWS datacenter IPs. YouTube blanket-blocks 
-datacenter IP ranges for yt-dlp requests — including the Whisper audio 
-fallback, which also uses yt-dlp for audio download. Residential IPs work 
+**Root cause:** Render runs on AWS datacenter IPs. YouTube blanket-blocks
+datacenter IP ranges for yt-dlp requests — including the Whisper audio
+fallback, which also uses yt-dlp for audio download. Residential IPs work
 fine; the issue is *who* makes the request, not the code itself.  
-**Verified locally:** Both transcript fetch and Whisper fallback work 
+**Verified locally:** Both transcript fetch and Whisper fallback work
 perfectly on local/residential IPs.  
-**Production fix:** Paid transcript API (Supadata, RapidAPI) or residential 
+**Production fix:** Paid transcript API (Supadata, RapidAPI) or residential
 proxy service. Documented as a known infrastructure limitation.
 
 ### Cold Start
-Backend deployed on Render free tier — expect 50–60 second cold start 
-after inactivity.
+Backend deployed on Render free tier — expect 50–60 second cold start after inactivity.
+
 ---
 
 ## Roadmap
