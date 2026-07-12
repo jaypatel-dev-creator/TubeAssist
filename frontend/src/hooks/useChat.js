@@ -34,7 +34,7 @@ export default function useChat(videoId, isVideoReady) {
 
     try {
       const response = await askQuestion(question, videoId);
-      const data = response.data;  // manual unwrap
+      const data = response.data;
       setMessages((prev) => [
         ...prev,
         makeMessage("ai", data.answer, false, data.from_video ?? true),
@@ -42,8 +42,8 @@ export default function useChat(videoId, isVideoReady) {
       setChatStatus(null);
       setChatMsg("");
     } catch (err) {
-      const message = err.response?.data?.detail ||
-                      err.response?.data?.message ||
+      const message = err.response?.data?.error ||
+                      err.response?.data?.detail ||
                       err.message ||
                       "Something went wrong.";
       setMessages((prev) => [...prev, makeMessage("ai", message, true, true)]);

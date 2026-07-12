@@ -36,9 +36,12 @@ class EmptyTranscriptException(TubeAssistException):
 
 
 class VideoAlreadyIndexedException(TubeAssistException):
-    def __init__(self, video_id: str):
+    def __init__(self, video_id: str, video_title: str, video_author: str):
+        self.video_id = video_id
+        self.video_title = video_title
+        self.video_author = video_author
         super().__init__(
-            message=f"Video '{video_id}' is already indexed.",
+            message=f"'{video_title}' is already indexed.",
             status_code=409
         )
 
@@ -61,6 +64,16 @@ class RAGException(TubeAssistException):
 
 # ── Handlers ───────────────────────────────────────────────────────────────────
 async def tubeassist_exception_handler(request: Request, exc: TubeAssistException) -> JSONResponse:
+    if isinstance(exc, VideoAlreadyIndexedException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error": exc.message,
+                "video_id": exc.video_id,
+                "video_title": exc.video_title,
+                "video_author": exc.video_author,
+            }
+        )
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": exc.message}

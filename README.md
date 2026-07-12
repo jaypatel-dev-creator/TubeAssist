@@ -10,7 +10,7 @@
 ![LangChain](https://img.shields.io/badge/LangChain-1.x-1C3C3C?style=flat)
 ![ChromaDB](https://img.shields.io/badge/ChromaDB-Local-FF6B35?style=flat)
 ![Pinecone](https://img.shields.io/badge/Pinecone-Production-00B388?style=flat)
-![Gemini](https://img.shields.io/badge/Gemini-2.5_Flash-4285F4?style=flat&logo=google&logoColor=white)
+![Gemini](https://img.shields.io/badge/Gemini-3.1_Flash_Lite-4285F4?style=flat&logo=google&logoColor=white)
 
 ---
 
@@ -20,7 +20,7 @@
 
 ## What is TubeAssist?
 
-TubeAssist lets you paste any YouTube URL and instantly start asking questions about the video — powered by a full RAG pipeline. The system fetches the video transcript via yt-dlp (with FasterWhisper as fallback), chunks it recursively, converts chunks into vector embeddings using Gemini Embeddings, stores them in ChromaDB (locally) or Pinecone (production), and retrieves the most relevant context to answer your questions using Gemini 2.5 Flash.
+TubeAssist lets you paste any YouTube URL and instantly start asking questions about the video — powered by a full RAG pipeline. The system fetches the video transcript via yt-dlp (with FasterWhisper as fallback), chunks it recursively, converts chunks into vector embeddings using Gemini Embeddings, stores them in ChromaDB (locally) or Pinecone (production), and retrieves the most relevant context to answer your questions using Gemini 3.1 Flash Lite.
 
 If a question is unrelated to the video, the system falls back to general LLM knowledge — clearly indicated to the user with a badge in the chat UI.
 
@@ -64,8 +64,8 @@ YouTube URL
 │                          │               │
 │                          ▼               │
 │                  rag_service             │
-│                  (context + memory       │
-│                   + Gemini 2.5 Flash)    │
+│               (context + memory          │
+│                + Gemini 3.1 Flash Lite ) │
 └──────────────────────────────────────────┘
 ```
 
@@ -101,7 +101,7 @@ Both stages route to the same `_llm_fallback()` — answering from general knowl
 | LangChain | RAG orchestration, memory, prompt templates |
 | ChromaDB | Local vector database |
 | Pinecone | Cloud vector database (production) |
-| Gemini 2.5 Flash | LLM for answer generation |
+| Gemini 3.1 Flash-Lite | LLM for answer generation |
 | Gemini Embeddings | Text → vector conversion (3072 dimensions) |
 | yt-dlp | Primary transcript + metadata extraction |
 | FasterWhisper (base) | Fallback audio transcription (lazy loaded) |

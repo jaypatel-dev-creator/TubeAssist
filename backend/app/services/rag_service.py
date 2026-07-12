@@ -21,11 +21,21 @@ def get_llm() -> ChatGoogleGenerativeAI:
     return _llm
 
 
+def extract_text_content(content) -> str:
+    """Normalize Gemini content — handles both string and list of parts."""
+    if isinstance(content, list):
+        return " ".join(
+            part.get("text", "") if isinstance(part, dict) else str(part)
+            for part in content
+        )
+    return content or ""
+
+
 def init_rag_service() -> None:
     global _llm, _prompt, _general_prompt
 
     _llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model="gemini-3.1-flash-lite",
         google_api_key=get_settings().gemini_api_key,
         temperature=0.3
     )
@@ -67,8 +77,9 @@ def _llm_fallback(question: str, chat_history: list, memory: ConversationBufferW
             question=question
         )
         response = get_llm().invoke(messages)
-        memory.save_context({"input": question}, {"output": response.content})
-        return {"answer": response.content, "sources": [], "from_video": False}
+        text = extract_text_content(response.content)
+        memory.save_context({"input": question}, {"output": text})
+        return {"answer": text, "sources": [], "from_video": False}
     except Exception as e:
         raise RAGException(f"Fallback LLM call failed: {str(e)}")
 
@@ -92,14 +103,15 @@ def ask(question: str, video_id: str | None = None) -> dict:
             question=question
         )
         response = get_llm().invoke(messages)
+        text = extract_text_content(response.content)
 
         # Stage 2 — LLM-as-a-Judge
-        if response.content.strip() == "NO_RELEVANT_CONTEXT":
+        if text.strip() == "NO_RELEVANT_CONTEXT":
             return _llm_fallback(question, chat_history, memory)
 
-        memory.save_context({"input": question}, {"output": response.content})
+        memory.save_context({"input": question}, {"output": text})
         return {
-            "answer": response.content,
+            "answer": text,
             "sources": [doc.metadata for doc in relevant_docs],
             "from_video": True
         }

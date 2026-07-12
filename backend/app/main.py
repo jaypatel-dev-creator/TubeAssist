@@ -88,7 +88,7 @@ def about():
             "Environment-based configuration — Chroma locally, Pinecone in production"
         ],
         "tech_stack": {
-            "backend": ["FastAPI", "LangChain", "Gemini 2.5 Flash", "Gemini Embeddings", "ChromaDB", "Pinecone", "FasterWhisper (Base)", "yt-dlp"],
+            "backend": ["FastAPI", "LangChain", "Gemini 3.1 Flash-Lite", "Gemini Embeddings", "ChromaDB", "Pinecone", "FasterWhisper (Base)", "yt-dlp"],
             "frontend": ["React", "Vite", "Axios"]
         },
         "endpoints": {

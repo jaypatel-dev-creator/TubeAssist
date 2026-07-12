@@ -12,7 +12,7 @@ FastAPI backend implementing a full RAG pipeline over YouTube video transcripts.
 | LangChain | RAG orchestration, prompt templates, memory |
 | ChromaDB | Local vector store |
 | Pinecone | Cloud vector store (production) |
-| Gemini 2.5 Flash | LLM for answer generation |
+| Gemini 3.1 Flash-Lite  | LLM for answer generation |
 | Gemini Embeddings | Text → vector conversion (3072 dimensions) |
 | yt-dlp | Primary transcript extraction + video metadata |
 | FasterWhisper | Fallback audio transcription (lazy loaded) |
@@ -100,7 +100,7 @@ User Question
 ├─► ChatPromptTemplate
 │         system + MessagesPlaceholder + context + question
 │
-├─► Gemini 2.5 Flash (temperature=0.3)
+├─► Gemini 3.1 Flash-Lite (temperature=0.3)
 │
 └─► memory.save_context()                     # persist turn
 ```
@@ -115,7 +115,6 @@ User Question
 ```
 
 ---
-
 ### `POST /videos/ingest`
 
 **Request**
@@ -142,7 +141,16 @@ User Question
 | `409` | Video already indexed |
 | `500` | Vector store failure |
 
-All errors return `{ "error": "..." }`.
+All errors return `{ "error": "..." }`. The `409` response also includes `video_id`, `video_title`, and `video_author` so the client can unlock chat without re-ingesting.
+
+```json
+{
+  "error": "'Video Title' is already indexed.",
+  "video_id": "VIDEO_ID",
+  "video_title": "Video Title",
+  "video_author": "Author"
+}
+```
 
 ---
 
@@ -188,6 +196,8 @@ All errors return `{ "error": "..." }`.
 **Conversation memory** — `ConversationBufferWindowMemory` with `k=5` built fresh per request inside `ask()`. Sliding window keeps prompt size bounded. Memory is intentionally in-RAM and per-request — no cross-request persistence.
 
 **Temperature=0.3** — low temperature keeps answers grounded in retrieved context. Higher values risk creative drift from source material.
+
+**Gemini 3+ content normalization** — `extract_text_content()` normalizes `response.content` which returns a list of parts in Gemini 3+ models instead of a plain string. Handles both formats so the pipeline works across model generations.
 
 ---
 

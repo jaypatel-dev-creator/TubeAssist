@@ -12,7 +12,11 @@ def ingest_video(url: str) -> dict:
     # Phase 2: Duplicate check
     video_id = transcript_data["video_id"]
     if video_exists(video_id):
-        raise VideoAlreadyIndexedException(video_id)
+        raise VideoAlreadyIndexedException(
+            video_id=video_id,
+            video_title=transcript_data["title"],
+            video_author=transcript_data["author"]
+        )
 
     # Phase 3: Chunking
     documents = create_chunks(transcript_data)

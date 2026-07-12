@@ -1,3 +1,4 @@
+import ReactMarkdown from "react-markdown";
 import "./MessageBubble.css";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -69,7 +70,11 @@ export default function MessageBubble({ message }) {
           className={bubbleClass}
           role={isError ? "alert" : undefined}
         >
-          {text}
+          {isUser || isError ? (
+            text
+          ) : (
+            <ReactMarkdown>{text}</ReactMarkdown>
+          )}
 
           {/* General knowledge badge — only on AI messages not from video */}
           {role === "ai" && fromVideo === false && !isError && (

@@ -24,30 +24,32 @@ export default function useVideoIngest() {
 
     try {
       const response = await ingestVideo(url);
-      const data = response.data;  // manual unwrap
-
-      if (data.status === "error") {
-        setIngestStatus("error");
-        setIngestMsg(data.message || "Something went wrong.");
-        return;
-      }
+      const data = response.data;
 
       setVideoId(data.video_id || "");
       setVideoTitle(data.video_title || "Untitled Video");
       setIngestStatus("success");
-      setIngestMsg(
-        data.status === "already_indexed"
-          ? "Already indexed — start asking questions!"
-          : "Video ready — start asking questions!"
-      );
+      setIngestMsg("Video ready — start asking questions!");
+
     } catch (err) {
-      const message = err.response?.data?.detail ||
-                      err.response?.data?.message ||
-                      err.message ||
-                      "Something went wrong.";
-      setVideoId("");
-      setIngestStatus("error");
-      setIngestMsg(message);
+      const status = err.response?.status;
+      const data = err.response?.data;
+
+      if (status === 409 && data?.video_id) {
+        // Video already indexed — restore state and allow chat
+        setVideoId(data.video_id);
+        setVideoTitle(data.video_title || "Untitled Video");
+        setIngestStatus("success");
+        setIngestMsg(`'${data.video_title}' is already indexed — start asking questions!`);
+      } else {
+        const message = data?.error ||
+                        data?.detail ||
+                        err.message ||
+                        "Something went wrong.";
+        setVideoId("");
+        setIngestStatus("error");
+        setIngestMsg(message);
+      }
     } finally {
       setIsIngesting(false);
     }
