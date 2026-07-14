@@ -28,7 +28,7 @@ def _init_pinecone():
     existing_indexes = [i.name for i in pc.list_indexes()]
     if settings.pinecone_index not in existing_indexes:
         pc.create_index(
-            name=settings.pinecone_index,
+            name=settings.pinecone_index, #index name 
             dimension=3072,
             metric="cosine",
             spec=ServerlessSpec(
@@ -43,8 +43,7 @@ def _init_pinecone():
         pinecone_api_key=settings.pinecone_api_key
     )
 
-
-# ── Singleton ──────────────────────────────────────────────────────────────────
+#module level variable  (singelton) that will contain either chroma or pinecone db 
 _vector_store = None
 
 
@@ -62,7 +61,7 @@ def init_vector_store() -> None:
         _vector_store = _init_chroma()
 
 
-# ── Public API (called by ingestion_service and retriever_service) ─────────────
+# Public functions  (called by ingestion_service and retriever_service) 
 def add_documents(documents) -> None:
     try:
         get_vector_store().add_documents(documents)
@@ -79,6 +78,7 @@ def video_exists(video_id: str) -> bool:
         raise VectorStoreException(f"Failed to check video existence: {str(e)}")
 
 
+#private functions 
 def _video_exists_chroma(video_id: str) -> bool:
     results = get_vector_store().get(
         where={"video_id": video_id}, limit=1

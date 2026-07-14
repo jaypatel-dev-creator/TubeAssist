@@ -43,13 +43,9 @@ def create_app() -> FastAPI:
     app.add_exception_handler(TubeAssistException, tubeassist_exception_handler)
     app.add_exception_handler(Exception, generic_exception_handler)
 
-    origins = ["https://tube-assist.vercel.app"]
-    if settings.app_env == "development":
-        origins.append("http://localhost:5173")
-
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=origins,
+        allow_origins=[settings.frontend_url],
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -67,32 +63,3 @@ app = create_app()
 @app.get("/")
 def root():
     return {"message": "Welcome to TubeAssist API"}
-
-
-@app.get("/about")
-def about():
-    return {
-        "project": "TubeAssist",
-        "version": "1.0",
-        "description": "AI-powered YouTube video assistant. Paste a video URL, ask questions, and get answers grounded in the video transcript using RAG.",
-        "features": [
-            "YouTube caption extraction via yt-dlp",
-            "FasterWhisper fallback transcription for videos without captions",
-            "Recursive text chunking with overlap (1000 chars / 200 overlap)",
-            "Gemini text embeddings (embedding-001, 3072 dimensions)",
-            "ChromaDB (local) and Pinecone (production) vector storage",
-            "Scoped retrieval via video_id metadata filtering",
-            "Two-stage relevance filtering — score threshold + LLM-as-a-Judge",
-            "LLM fallback to general knowledge when no relevant context found",
-            "Conversation memory across follow-up questions (last 5 turns)",
-            "Environment-based configuration — Chroma locally, Pinecone in production"
-        ],
-        "tech_stack": {
-            "backend": ["FastAPI", "LangChain", "Gemini 3.1 Flash-Lite", "Gemini Embeddings", "ChromaDB", "Pinecone", "FasterWhisper (Base)", "yt-dlp"],
-            "frontend": ["React", "Vite", "Axios"]
-        },
-        "endpoints": {
-            "POST /videos/ingest": "Extract transcript, chunk, embed and store a YouTube video",
-            "POST /chat/ask": "Ask a question about an ingested video"
-        }
-    }

@@ -9,7 +9,7 @@ FastAPI backend implementing a full RAG pipeline over YouTube video transcripts.
 | Technology | Purpose |
 |---|---|
 | FastAPI + Uvicorn | REST API, ASGI server |
-| LangChain | RAG orchestration, prompt templates, memory |
+| LangChain | RAG orchestration, prompt templates |
 | ChromaDB | Local vector store |
 | Pinecone | Cloud vector store (production) |
 | Gemini 3.1 Flash-Lite  | LLM for answer generation |
@@ -45,7 +45,7 @@ backend/
 │   │   ├── vector_store_service.py   # ChromaDB / Pinecone singleton
 │   │   ├── retriever_service.py      # similarity search + score normalization
 │   │   ├── ingestion_service.py      # ingestion orchestrator
-│   │   └── rag_service.py            # RAG + LLM fallback + memory
+│   │   └── rag_service.py            # RAG + LLM fallback 
 │   └── main.py                       # FastAPI app + lifespan + exception handlers
 ├── .env.example
 ├── render.yaml
@@ -78,12 +78,9 @@ YouTube URL
 ChromaDB (local) / Pinecone (prod)
 ```
 
-
 ### Phase 2 — Query
 ```
 User Question
-│
-├─► _build_memory()                           # fresh ConversationBufferWindowMemory (k=5)
 │
 ├─► retrieve_with_scores()
 │         k=6, filter={"video_id": video_id}
@@ -98,11 +95,9 @@ User Question
 │         └── LLM returns "NO_RELEVANT_CONTEXT" → LLM fallback → from_video: false
 │
 ├─► ChatPromptTemplate
-│         system + MessagesPlaceholder + context + question
+│         system + context + question
 │
-├─► Gemini 3.1 Flash-Lite (temperature=0.3)
-│
-└─► memory.save_context()                     # persist turn
+└─► Gemini 3.1 Flash-Lite (temperature=0.3)
 ```
 ---
 
@@ -193,8 +188,6 @@ All errors return `{ "error": "..." }`. The `409` response also includes `video_
 
 **Score normalization** — ChromaDB returns distance (lower = more relevant), Pinecone returns similarity (higher = more relevant). Pinecone scores normalized via `1 - score` so both backends share the same `0.7` threshold.
 
-**Conversation memory** — `ConversationBufferWindowMemory` with `k=5` built fresh per request inside `ask()`. Sliding window keeps prompt size bounded. Memory is intentionally in-RAM and per-request — no cross-request persistence.
-
 **Temperature=0.3** — low temperature keeps answers grounded in retrieved context. Higher values risk creative drift from source material.
 
 **Gemini 3+ content normalization** — `extract_text_content()` normalizes `response.content` which returns a list of parts in Gemini 3+ models instead of a plain string. Handles both formats so the pipeline works across model generations.
@@ -230,14 +223,13 @@ Integration testing via Swagger UI (`http://localhost:8000/docs`):
 `POST /chat/ask` edge cases:
 - Relevant question → grounded answer, `from_video: true`
 - Irrelevant question → LLM fallback, `from_video: false`
-- Follow-up question → memory maintained across turns
 
 ---
 
 ## Limitations
 
-- Conversation memory is in-RAM only — not persistent across server restarts
-- No user session isolation — fresh memory per request, no cross-request continuity
+- No conversation memory — each request is stateless, no cross-request history
+- Session-based memory (Redis) planned for v2
 - Whisper fallback is slow on CPU (~2-4 min for a 5 min video with `base` model)
 
 ---
@@ -251,4 +243,3 @@ Integration testing via Swagger UI (`http://localhost:8000/docs`):
 - **Module-Level Singletons** — production FastAPI pattern: expensive resources initialized once in `lifespan()`, accessed directly in services — no DI chain needed
 - **Typed Exception Hierarchy** — base exception + domain subclasses + global handlers: routes stay clean, errors always return correct HTTP status codes
 - **Dual Transcript Strategy** — yt-dlp primary with FasterWhisper lazy-loaded fallback, safe temp file handling via `pathlib`
-- **Conversation Memory** — `ConversationBufferWindowMemory` with sliding window keeps prompt size bounded across long sessions

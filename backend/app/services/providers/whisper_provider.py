@@ -2,12 +2,11 @@ import yt_dlp       ## to extract audio from video
 import tempfile      ## to save the audio file extracted from yt video inside OS temporary directory rather than project folder
 from pathlib import Path
 
-# ── Lazy loading — Whisper model only loads when actually needed ──────────────
-# This prevents RAM consumption at server startup on Render free tier (512MB limit) along with zero RAM consumption locally when no whisper fallback is triggered
+
 _model = None
 
 def _get_model():
-    global _model #tells python to modify the global _model variable , instead of creating a local _model variable. 
+    global _model 
     if _model is None:
         from faster_whisper import WhisperModel 
         _model = WhisperModel("base", device="cpu") # we are using faster whisper base model
@@ -17,8 +16,8 @@ def _get_model():
 
 # download_audio() uses ytdlp to download best audio to feed to faster whisper 
 def download_audio(url: str) -> Path:
-    temp_dir = Path(tempfile.gettempdir())          # getting temp directory
-    output = str(temp_dir / "temp_audio.%(ext)s") # saving audio file in temp dir
+    temp_dir = Path(tempfile.gettempdir())          
+    output = str(temp_dir / "temp_audio.%(ext)s") 
 
     ydl_opts = {
         "format": "bestaudio/best",  # download the best audio quality

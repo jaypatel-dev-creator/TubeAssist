@@ -8,6 +8,7 @@ class Settings(BaseSettings):
 
     # App
     app_env: str = "development"
+    frontend_url: str = "http://localhost:5173"
 
     # Vector store
     vector_store: str = "chroma"

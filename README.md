@@ -64,7 +64,7 @@ YouTube URL
 │                          │               │
 │                          ▼               │
 │                  rag_service             │
-│               (context + memory          │
+│               (context +                 │
 │                + Gemini 3.1 Flash Lite ) │
 └──────────────────────────────────────────┘
 ```
@@ -98,7 +98,7 @@ Both stages route to the same `_llm_fallback()` — answering from general knowl
 | Technology | Role |
 |---|---|
 | FastAPI + Uvicorn | REST API, ASGI server |
-| LangChain | RAG orchestration, memory, prompt templates |
+| LangChain | RAG orchestration, prompt templates |
 | ChromaDB | Local vector database |
 | Pinecone | Cloud vector database (production) |
 | Gemini 3.1 Flash-Lite | LLM for answer generation |
@@ -232,4 +232,4 @@ Backend deployed on Render free tier — expect 50–60 second cold start after 
 ---
 
 ## Roadmap
-Session-based memory (Redis) and streaming responses planned for v2.
+Session-based conversation memory (Redis) and streaming responses planned for v2.

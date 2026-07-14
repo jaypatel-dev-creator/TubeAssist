@@ -27,6 +27,14 @@ class TranscriptFetchException(TubeAssistException):
         )
 
 
+class MetadataFetchException(TubeAssistException):
+    def __init__(self):
+        super().__init__(
+            message="Could not fetch video metadata. Check if the video exists and is public.",
+            status_code=422
+        )
+
+
 class EmptyTranscriptException(TubeAssistException):
     def __init__(self):
         super().__init__(
@@ -47,17 +55,17 @@ class VideoAlreadyIndexedException(TubeAssistException):
 
 
 class VectorStoreException(TubeAssistException):
-    def __init__(self, detail: str = "Vector store operation failed."):
+    def __init__(self, message: str = "Vector store operation failed."):
         super().__init__(
-            message=detail,
+            message=message,
             status_code=500
         )
 
 
 class RAGException(TubeAssistException):
-    def __init__(self, detail: str = "Failed to generate answer."):
+    def __init__(self, message: str = "Failed to generate answer."):
         super().__init__(
-            message=detail,
+            message=message,
             status_code=500
         )
 

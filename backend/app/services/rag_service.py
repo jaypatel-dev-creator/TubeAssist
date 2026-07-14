@@ -1,6 +1,5 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_classic.memory import ConversationBufferWindowMemory
+from langchain_core.prompts import ChatPromptTemplate
 
 from app.services.retriever_service import retrieve_with_scores
 from app.core.config import get_settings
@@ -49,7 +48,6 @@ Follow these rules strictly:
 2. If the context is NOT relevant to the question — respond with exactly this phrase and nothing else:
    "NO_RELEVANT_CONTEXT"
 Do not hallucinate. Do not make up facts."""),
-        MessagesPlaceholder(variable_name="chat_history"),
         ("human", "Context: {context}\nQuestion: {question}")
     ])
 
@@ -57,28 +55,15 @@ Do not hallucinate. Do not make up facts."""),
         ("system", """You are a helpful general assistant.
 Answer the user's question using your own knowledge.
 Be concise and accurate."""),
-        MessagesPlaceholder(variable_name="chat_history"),
         ("human", "{question}")
     ])
 
 
-def _build_memory() -> ConversationBufferWindowMemory:
-    return ConversationBufferWindowMemory(
-        k=5,
-        memory_key="chat_history",
-        return_messages=True
-    )
-
-
-def _llm_fallback(question: str, chat_history: list, memory: ConversationBufferWindowMemory) -> dict:
+def _llm_fallback(question: str) -> dict:
     try:
-        messages = _general_prompt.format_messages(
-            chat_history=chat_history,
-            question=question
-        )
+        messages = _general_prompt.format_messages(question=question)
         response = get_llm().invoke(messages)
         text = extract_text_content(response.content)
-        memory.save_context({"input": question}, {"output": text})
         return {"answer": text, "sources": [], "from_video": False}
     except Exception as e:
         raise RAGException(f"Fallback LLM call failed: {str(e)}")
@@ -86,19 +71,15 @@ def _llm_fallback(question: str, chat_history: list, memory: ConversationBufferW
 
 def ask(question: str, video_id: str | None = None) -> dict:
     try:
-        memory = _build_memory()
-        chat_history = memory.load_memory_variables({})["chat_history"]
-
         docs_with_scores = retrieve_with_scores(query=question, video_id=video_id)
         relevant_docs = [doc for doc, score in docs_with_scores if score < THRESHOLD]
 
         # Stage 1 — score filter
         if not relevant_docs:
-            return _llm_fallback(question, chat_history, memory)
+            return _llm_fallback(question)
 
         context = "\n\n".join(doc.page_content for doc in relevant_docs)
         messages = _prompt.format_messages(
-            chat_history=chat_history,
             context=context,
             question=question
         )
@@ -107,9 +88,8 @@ def ask(question: str, video_id: str | None = None) -> dict:
 
         # Stage 2 — LLM-as-a-Judge
         if text.strip() == "NO_RELEVANT_CONTEXT":
-            return _llm_fallback(question, chat_history, memory)
+            return _llm_fallback(question)
 
-        memory.save_context({"input": question}, {"output": text})
         return {
             "answer": text,
             "sources": [doc.metadata for doc in relevant_docs],

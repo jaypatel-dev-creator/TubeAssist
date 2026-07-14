@@ -6,10 +6,11 @@ def retrieve_with_scores(query: str, k: int = 6, video_id: str | None = None) ->
     vector_store = get_vector_store()
 
     if video_id is not None:
+        #scoped retrieval 
         results = vector_store.similarity_search_with_score(
             query=query, k=k, filter={"video_id": video_id}
         )
-    else:
+    else:#global retrieval 
         results = vector_store.similarity_search_with_score(
             query=query, k=k
         )

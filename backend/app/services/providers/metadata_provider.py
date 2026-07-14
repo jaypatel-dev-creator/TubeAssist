@@ -1,4 +1,5 @@
 import yt_dlp
+from app.core.exceptions import MetadataFetchException
 
 
 def get_video_metadata(url: str) -> dict:
@@ -7,10 +8,13 @@ def get_video_metadata(url: str) -> dict:
         "skip_download": True
     }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
 
-    return {
-        "title": info.get("title", "Unknown"),
-        "author": info.get("uploader", "Unknown")
-    }
+        return {
+            "title": info.get("title", "Unknown"),
+            "author": info.get("uploader", "Unknown")
+        }
+    except Exception as e:
+        raise MetadataFetchException()
