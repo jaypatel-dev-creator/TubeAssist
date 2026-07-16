@@ -2,7 +2,7 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from app.core.config import get_settings
 
 
-# ── Singleton ──────────────────────────────────────────────────────────────────
+# module level singleton 
 _embeddings: GoogleGenerativeAIEmbeddings | None = None
 
 

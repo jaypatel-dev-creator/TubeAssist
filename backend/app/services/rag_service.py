@@ -8,7 +8,7 @@ from app.core.exceptions import RAGException
 
 THRESHOLD = 0.7
 
-# ── Singletons ─────────────────────────────────────────────────────────────────
+# Module level singletons 
 _llm: ChatGoogleGenerativeAI | None = None
 _prompt: ChatPromptTemplate | None = None
 _general_prompt: ChatPromptTemplate | None = None

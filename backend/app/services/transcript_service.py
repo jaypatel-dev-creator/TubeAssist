@@ -21,6 +21,7 @@ def extract_video_id(url: str) -> str:
 
 
 def get_transcript(url: str) -> dict:
+
     video_id = extract_video_id(url)
 
     try:
