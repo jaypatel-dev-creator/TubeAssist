@@ -49,7 +49,7 @@ _vector_store = None
 
 def get_vector_store():
     if _vector_store is None:
-        raise RuntimeError("Vector store not initialized. Call init_services() on startup.")
+        raise RuntimeError("Vector store not initialized. Call init_vector_store() on startup.")
     return _vector_store
 
 
