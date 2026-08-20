@@ -6,6 +6,9 @@ class Settings(BaseSettings):
     # Gemini
     gemini_api_key: str
 
+    # Groq
+    groq_api_key: str
+
     # App
     app_env: str = "development"
     frontend_url: str = "http://localhost:5173"
