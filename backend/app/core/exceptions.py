@@ -20,9 +20,9 @@ class InvalidURLException(TubeAssistException):
 
 
 class TranscriptFetchException(TubeAssistException):
-    def __init__(self):
+    def __init__(self, message: str = "Could not fetch transcript. Check if the video exists and is public."):
         super().__init__(
-            message="Could not fetch transcript. Check if the video exists and is public.",
+            message=message,
             status_code=422
         )
 
