@@ -1,11 +1,10 @@
 from pydantic import BaseModel
-from typing import Optional
 
 
 # request schema 
 class ChatRequest(BaseModel):
     question: str
-    video_id: Optional[str] = None
+    video_id: str | None = None
 
 # response 
 # sources contains a list of metadata objects — each validated separately via ChunkMetadata

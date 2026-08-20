@@ -8,7 +8,7 @@ _embeddings: GoogleGenerativeAIEmbeddings | None = None
 
 def get_embedding_model() -> GoogleGenerativeAIEmbeddings:
     if _embeddings is None:
-        raise RuntimeError("Embedding model not initialized. Call init_services() on startup.")
+        raise RuntimeError("Embedding model not initialized. Call init_embedding_model() on startup.")
     return _embeddings
 
 

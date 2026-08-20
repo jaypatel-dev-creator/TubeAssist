@@ -4,6 +4,7 @@ from pathlib import Path
 from groq import Groq
 
 from app.core.config import get_settings
+from app.core.exceptions import TranscriptFetchException
 
 
 # download_audio() uses yt-dlp to download audio as mp3 to feed to Groq Whisper API
@@ -27,7 +28,7 @@ def download_audio(url: str) -> Path:
     # find the downloaded mp3 file
     audio_files = list(temp_dir.glob("temp_audio.*"))
     if not audio_files:
-        raise Exception("Audio download failed")
+        raise TranscriptFetchException()  # surfaces cleanly as 422 to the user
 
     return audio_files[0]
 

@@ -15,7 +15,7 @@ FastAPI backend implementing a full RAG pipeline over YouTube video transcripts.
 | Gemini 3.1 Flash-Lite  | LLM for answer generation |
 | Gemini Embeddings | Text → vector conversion (3072 dimensions) |
 | yt-dlp | Primary transcript extraction + video metadata |
-| FasterWhisper | Fallback audio transcription (lazy loaded) |
+| Groq Whisper API (whisper-large-v3-turbo) | Fallback audio transcription |
 | Pydantic + pydantic-settings | Request/response validation + config management |
 
 ---
@@ -37,7 +37,7 @@ backend/
 │   ├── services/
 │   │   ├── providers/
 │   │   │   ├── youtube_provider.py   # yt-dlp caption extraction
-│   │   │   ├── whisper_provider.py   # FasterWhisper fallback (lazy loaded)
+│   │   │   ├── whisper_provider.py   # Groq Whisper API fallback
 │   │   │   └── metadata_provider.py  # video title, author via yt-dlp
 │   │   ├── transcript_service.py     # transcript orchestration
 │   │   ├── chunking_service.py       # RecursiveCharacterTextSplitter singleton
@@ -64,7 +64,7 @@ YouTube URL
 ├─► extract_video_id()                        # regex extraction
 │         │
 │         ├─► yt-dlp                          # primary transcript extraction
-│         └─► FasterWhisper                   # fallback transcript extraction
+│         └─► Groq Whisper API                # fallback transcript extraction
 │
 ├─► metadata_provider                         # title, author via yt-dlp
 │
@@ -178,11 +178,11 @@ All errors return `{ "error": "..." }`. The `409` response also includes `video_
 
 **Typed exception hierarchy** — `TubeAssistException` base class with domain subclasses (`InvalidURLException`, `TranscriptFetchException`, `VideoAlreadyIndexedException`, `VectorStoreException`, `RAGException`). Two global handlers in `main.py` ensure every error returns the correct HTTP status code with a consistent `{"error": "..."}` shape. Routes contain zero try/except.
 
-**Pydantic-settings config** — `BaseSettings` with `get_settings()` + `@lru_cache`. Validated at startup — missing `GEMINI_API_KEY` refuses server start immediately rather than failing mid-request.
+**Pydantic-settings config** — `BaseSettings` with `get_settings()` + `@lru_cache`. Validated at startup — missing `GEMINI_API_KEY` or `GROQ_API_KEY` refuses server start immediately rather than failing mid-request.
 
 **Two-stage relevance filtering** — Stage 1 applies cosine distance threshold (0.7) to filter mathematically irrelevant chunks. Stage 2 uses LLM-as-a-Judge — model returns `"NO_RELEVANT_CONTEXT"` if chunks don't actually answer the question. Both stages trigger the same `_llm_fallback()`.
 
-**Dual transcript strategy** — yt-dlp attempted first (fast, no compute). Empty or missing captions trigger FasterWhisper fallback. Whisper model loads lazily — only when needed — keeping RAM low on free-tier deployment.
+**Dual transcript strategy** — yt-dlp attempted first (fast, no compute). Empty or missing captions trigger Groq Whisper API fallback — audio downloaded via yt-dlp, transcribed via Groq's hosted `whisper-large-v3-turbo`. No local model loading, no memory overhead.
 
 **Chunking strategy** — `RecursiveCharacterTextSplitter` with `chunk_size=1000` and `chunk_overlap=200`. Splits on natural boundaries (paragraphs → sentences → words). Each chunk carries `video_id`, `title`, `author`, `chunk_index` metadata.
 
@@ -202,7 +202,7 @@ python -m venv venv
 source venv/bin/activate       # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env
-# fill in GEMINI_API_KEY in .env
+# fill in GEMINI_API_KEY and GROQ_API_KEY in .env
 uvicorn app.main:app --reload
 # API at http://localhost:8000
 # Docs at http://localhost:8000/docs
@@ -218,19 +218,11 @@ Integration testing via Swagger UI (`http://localhost:8000/docs`):
 - Valid URL → successful ingestion, `chunks_stored` returned
 - Same URL twice → `409 already indexed`
 - Invalid URL → `422` with clear error message
-- Video without captions → Whisper fallback triggered
+- Video without captions → Groq Whisper API fallback triggered
 
 `POST /chat/ask` edge cases:
 - Relevant question → grounded answer, `from_video: true`
 - Irrelevant question → LLM fallback, `from_video: false`
-
----
-
-## Limitations
-
-- No conversation memory — each request is stateless, no cross-request history
-- Session-based memory (Redis) planned for v2
-- Whisper fallback is slow on CPU (~2-4 min for a 5 min video with `base` model)
 
 ---
 
@@ -242,4 +234,4 @@ Integration testing via Swagger UI (`http://localhost:8000/docs`):
 - **Pydantic-Settings Config** — `BaseSettings` with `@lru_cache` for validated, type-safe config as a singleton — replaces scattered `os.getenv()` calls
 - **Module-Level Singletons** — production FastAPI pattern: expensive resources initialized once in `lifespan()`, accessed directly in services — no DI chain needed
 - **Typed Exception Hierarchy** — base exception + domain subclasses + global handlers: routes stay clean, errors always return correct HTTP status codes
-- **Dual Transcript Strategy** — yt-dlp primary with FasterWhisper lazy-loaded fallback, safe temp file handling via `pathlib`
+- **Dual Transcript Strategy** — yt-dlp primary with Groq Whisper API fallback, safe temp file handling via `pathlib`

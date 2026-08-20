@@ -20,7 +20,7 @@
 
 ## What is TubeAssist?
 
-TubeAssist lets you paste any YouTube URL and instantly start asking questions about the video — powered by a full RAG pipeline. The system fetches the video transcript via yt-dlp (with FasterWhisper as fallback), chunks it recursively, converts chunks into vector embeddings using Gemini Embeddings, stores them in ChromaDB (locally) or Pinecone (production), and retrieves the most relevant context to answer your questions using Gemini 3.1 Flash Lite.
+TubeAssist lets you paste any YouTube URL and instantly start asking questions about the video — powered by a full RAG pipeline. The system fetches the video transcript via yt-dlp (with Groq Whisper API as fallback), chunks it recursively, converts chunks into vector embeddings using Gemini Embeddings, stores them in ChromaDB (locally) or Pinecone (production), and retrieves the most relevant context to answer your questions using Gemini 3.1 Flash Lite.
 
 If a question is unrelated to the video, the system falls back to general LLM knowledge — clearly indicated to the user with a badge in the chat UI.
 
@@ -37,8 +37,8 @@ YouTube URL
 │                                          │
 │  transcript_service → chunking_service   │
 │  (yt-dlp primary,    (RecursiveCharacter │
-│   Whisper fallback)   TextSplitter)      │
-│                          │               │
+│   Groq Whisper        TextSplitter)      │
+│   API fallback)          │               │
 │                          ▼               │
 │                 embedding_service        │
 │                 (Gemini Embeddings)      │
@@ -104,7 +104,7 @@ Both stages route to the same `_llm_fallback()` — answering from general knowl
 | Gemini 3.1 Flash-Lite | LLM for answer generation |
 | Gemini Embeddings | Text → vector conversion (3072 dimensions) |
 | yt-dlp | Primary transcript + metadata extraction |
-| FasterWhisper (base) | Fallback audio transcription (lazy loaded) |
+| Groq Whisper API (whisper-large-v3-turbo) | Fallback audio transcription |
 | Pydantic + pydantic-settings | Request/response validation + config management |
 
 ### Frontend
@@ -121,6 +121,7 @@ Both stages route to the same `_llm_fallback()` — answering from general knowl
 - Python 3.12+
 - Node.js 18+
 - Google Gemini API key
+- Groq API key
 
 ### Backend Setup
 ```bash
@@ -128,7 +129,7 @@ cd backend
 python -m venv venv
 source venv/bin/activate      # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env          # fill in GEMINI_API_KEY
+cp .env.example .env          # fill in GEMINI_API_KEY and GROQ_API_KEY
 uvicorn app.main:app --reload
 # API at http://localhost:8000
 # Docs at http://localhost:8000/docs
@@ -152,6 +153,7 @@ npm run dev
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `GEMINI_API_KEY` | Yes | — | Google Gemini API key |
+| `GROQ_API_KEY` | Yes | — | Groq API key for Whisper fallback |
 | `APP_ENV` | No | `development` | controls Swagger UI visibility and CORS origins |
 | `VECTOR_STORE` | No | `chroma` | `chroma` locally, `pinecone` in production |
 | `PINECONE_API_KEY` | Pinecone only | — | Pinecone API key |
@@ -167,7 +169,7 @@ npm run dev
 
 ## Configuration
 
-Config is managed via `pydantic-settings` `BaseSettings` — validated at startup, not scattered `os.getenv()` calls. If `GEMINI_API_KEY` is missing, the server refuses to start with a clear validation error rather than failing silently mid-request.
+Config is managed via `pydantic-settings` `BaseSettings` — validated at startup, not scattered `os.getenv()` calls. If `GEMINI_API_KEY` or `GROQ_API_KEY` is missing, the server refuses to start with a clear validation error rather than failing silently mid-request.
 
 **Local dev:**
 ```bash
@@ -179,6 +181,7 @@ uvicorn app.main:app --reload
 Set all vars directly in Render dashboard — no `.env` files needed. `pydantic-settings` reads from environment directly.
 ```
 GEMINI_API_KEY=your_key
+GROQ_API_KEY=your_key
 APP_ENV=production
 VECTOR_STORE=pinecone
 PINECONE_API_KEY=your_key
@@ -190,7 +193,7 @@ PINECONE_INDEX=tubeassist
 ## Deployment
 
 **Backend → Render**
-Push to GitHub → Render auto-deploys via `render.yaml`. Set `GEMINI_API_KEY` and `PINECONE_API_KEY` manually in Render dashboard (secrets). Everything else is handled by `render.yaml`.
+Push to GitHub → Render auto-deploys via `render.yaml`. Set `GEMINI_API_KEY`, `GROQ_API_KEY`, and `PINECONE_API_KEY` manually in Render dashboard (secrets). Everything else is handled by `render.yaml`.
 
 **Frontend → Vercel**
 Connect GitHub repo to Vercel. Set `VITE_API_URL=https://your-render-url.com` in Vercel dashboard → Environment Variables. Vite bakes it into the bundle at deploy time.
@@ -205,7 +208,7 @@ Connect GitHub repo to Vercel. Set `VITE_API_URL=https://your-render-url.com` in
 
 **Why two-stage filtering over one?** Score filter alone can't detect semantic irrelevance — a chunk can be mathematically close but contextually wrong. LLM judge alone without pre-filtering wastes tokens on garbage chunks. Together: Stage 1 narrows candidates cheaply, Stage 2 makes the final semantic call.
 
-**Why lazy Whisper loading?** FasterWhisper base model requires ~600MB RAM. Loading at startup on Render's free tier (512MB) causes OOM crashes. Lazy loading means it only loads when a video has no captions — most tech and educational videos have auto-generated captions, so Whisper rarely fires in practice.
+**Why Groq Whisper API over local Whisper?** Running faster-whisper locally requires ctranslate2 — a heavy compiled C++ dependency that bloats the build and exceeds Render's free tier limits. Groq's hosted `whisper-large-v3-turbo` runs on their LPU hardware, eliminates the local model entirely, and delivers faster transcription with equal or better accuracy.
 
 **Why Pinecone for production?** ChromaDB is embedded and writes to disk. Render's free tier has ephemeral storage that wipes on every deploy. Pinecone is cloud-hosted and persistent across restarts and redeployments.
 
