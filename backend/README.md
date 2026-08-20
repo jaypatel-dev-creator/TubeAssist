@@ -182,7 +182,7 @@ All errors return `{ "error": "..." }`. The `409` response also includes `video_
 
 **Two-stage relevance filtering** — Stage 1 applies cosine distance threshold (0.7) to filter mathematically irrelevant chunks. Stage 2 uses LLM-as-a-Judge — model returns `"NO_RELEVANT_CONTEXT"` if chunks don't actually answer the question. Both stages trigger the same `_llm_fallback()`.
 
-**Dual transcript strategy** — yt-dlp attempted first (fast, no compute). Empty or missing captions trigger Groq Whisper API fallback — audio downloaded via yt-dlp, transcribed via Groq's hosted `whisper-large-v3-turbo`. No local model loading, no memory overhead.
+**Dual transcript strategy** — yt-dlp attempted first (fast, no compute). Empty or missing captions trigger Groq Whisper API fallback — audio downloaded via yt-dlp at 64kbps mp3, transcribed via Groq's hosted `whisper-large-v3-turbo`. 64kbps keeps audio at ~28MB/hour, staying safely under Groq's 25MB free tier limit for videos up to ~50 minutes. A 24MB size guard runs post-download as a safety net — if the file still exceeds the threshold, it is deleted and a clean 422 is returned before the Groq call is made.
 
 **Chunking strategy** — `RecursiveCharacterTextSplitter` with `chunk_size=1000` and `chunk_overlap=200`. Splits on natural boundaries (paragraphs → sentences → words). Each chunk carries `video_id`, `title`, `author`, `chunk_index` metadata.
 
@@ -219,6 +219,7 @@ Integration testing via Swagger UI (`http://localhost:8000/docs`):
 - Same URL twice → `409 already indexed`
 - Invalid URL → `422` with clear error message
 - Video without captions → Groq Whisper API fallback triggered
+- Video over ~50 minutes → `422` with clear file size error message
 
 `POST /chat/ask` edge cases:
 - Relevant question → grounded answer, `from_video: true`
@@ -234,4 +235,4 @@ Integration testing via Swagger UI (`http://localhost:8000/docs`):
 - **Pydantic-Settings Config** — `BaseSettings` with `@lru_cache` for validated, type-safe config as a singleton — replaces scattered `os.getenv()` calls
 - **Module-Level Singletons** — production FastAPI pattern: expensive resources initialized once in `lifespan()`, accessed directly in services — no DI chain needed
 - **Typed Exception Hierarchy** — base exception + domain subclasses + global handlers: routes stay clean, errors always return correct HTTP status codes
-- **Dual Transcript Strategy** — yt-dlp primary with Groq Whisper API fallback, safe temp file handling via `pathlib`
+- **Dual Transcript Strategy** — yt-dlp primary with Groq Whisper API fallback; 64kbps bitrate cap + 24MB size guard handle Groq's free tier file size constraint cleanly

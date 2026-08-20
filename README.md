@@ -208,7 +208,11 @@ Connect GitHub repo to Vercel. Set `VITE_API_URL=https://your-render-url.com` in
 
 **Why two-stage filtering over one?** Score filter alone can't detect semantic irrelevance — a chunk can be mathematically close but contextually wrong. LLM judge alone without pre-filtering wastes tokens on garbage chunks. Together: Stage 1 narrows candidates cheaply, Stage 2 makes the final semantic call.
 
-**Why Groq Whisper API over local Whisper?** Running faster-whisper locally requires ctranslate2 — a heavy compiled C++ dependency that bloats the build and exceeds Render's free tier limits. Groq's hosted `whisper-large-v3-turbo` runs on their LPU hardware, eliminates the local model entirely, and delivers faster transcription with equal or better accuracy.
+**Why Groq Whisper API over local Whisper?** Hit this as a real production constraint: faster-whisper is a heavy model that would exceed Render's free tier 512MB RAM limit and crash the server the moment the Whisper fallback was triggered. Swapped it for Groq's hosted `whisper-large-v3-turbo` via API — eliminated the local model entirely, zero memory overhead, equal or better transcription quality. The principle: if a hosted API exists for a capability that isn't security-sensitive, there's no reason to run it locally. Local models make sense for air-gapped environments or strict data privacy requirements — neither applies here.
+
+**Why 64kbps mp3 for audio download?** Groq's free tier Whisper endpoint has a 25MB file size limit. Forcing yt-dlp to download at 64kbps mp3 keeps audio at ~28MB/hour — videos up to ~50 minutes stay safely under the limit. A 24MB size guard runs after download as a safety net: if the file still exceeds the threshold, it's deleted and a clear error is returned to the user before the Groq call is ever made.
+
+**yt-dlp blocked on Render (infrastructure constraint, not a code bug):** Render runs on AWS datacenter IPs. YouTube blanket-blocks datacenter IP ranges for yt-dlp requests — both caption extraction and the Whisper audio download path are affected. Works perfectly on residential IPs. Documented honestly as a known infrastructure limitation; the fix is a paid transcript API or a different hosting provider, not a code change. Distinguishing between a code bug, an architecture mistake, and an infrastructure constraint matters — this was the third kind.
 
 **Why Pinecone for production?** ChromaDB is embedded and writes to disk. Render's free tier has ephemeral storage that wipes on every deploy. Pinecone is cloud-hosted and persistent across restarts and redeployments.
 
@@ -221,16 +225,26 @@ Connect GitHub repo to Vercel. Set `VITE_API_URL=https://your-render-url.com` in
 ### YouTube Transcript Fetch — Render Deployment
 **Status:** Blocked in production  
 **Root cause:** Render runs on AWS datacenter IPs. YouTube blanket-blocks
-datacenter IP ranges for yt-dlp requests — including the Whisper audio
-fallback, which also uses yt-dlp for audio download. Residential IPs work
-fine; the issue is *who* makes the request, not the code itself.  
+datacenter IP ranges for yt-dlp requests — both caption extraction and the
+Whisper audio download path are affected. Residential IPs work fine; the
+issue is *who* makes the request, not the code itself.  
 **Verified locally:** Both transcript fetch and Whisper fallback work
 perfectly on local/residential IPs.  
-**Production fix:** Paid transcript API (Supadata, RapidAPI) or residential
-proxy service. Documented as a known infrastructure limitation.
+**Production fix:** Paid transcript API (Supadata, RapidAPI) or different
+hosting provider. This is an infrastructure constraint, not a code bug —
+nothing in the codebase needs fixing.
+
+### Groq Whisper — Video Length
+Groq's free tier Whisper endpoint has a 25MB file size limit. Audio is
+downloaded at 64kbps mp3, keeping videos up to ~50 minutes safely under
+the limit. Videos beyond that trigger a clean 422 error with a clear
+message to the user.
 
 ### Cold Start
-Backend deployed on Render free tier — expect 50–60 second cold start after inactivity.
+Backend deployed on Render free tier — expect 50–60 second cold start
+after inactivity.
+
+
 
 ---
 
