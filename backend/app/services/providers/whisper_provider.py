@@ -58,9 +58,9 @@ def get_whisper_transcript(url: str) -> str:
             transcription = client.audio.transcriptions.create(
                 file=audio_file,
                 model="whisper-large-v3-turbo",  # best price-to-performance on Groq free tier
-                language="en",                   # explicitly set to improve accuracy and latency
                 response_format="text",          # returns plain string directly
                 temperature=0.0                  # deterministic output
+                # language not set — whisper-large-v3-turbo auto-detects, supports multilingual content
             )
 
         return transcription  # response_format="text" returns the transcript string directly
