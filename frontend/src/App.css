@@ -1,14 +1,8 @@
-
-@keyframes appFadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-
+/* ── Body base (overrides index.css for layout) ── */
 body {
-  background: #0a0a0d;
-  color: #e8e8f0;
-  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
   height: 100vh;
   overflow: hidden;
 }
@@ -20,7 +14,6 @@ body {
   height: 100vh;
   max-width: 820px;
   margin: 0 auto;
-  animation: appFadeIn 0.35s ease forwards;
 }
 
 /* ── Header ── */
@@ -28,9 +21,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px 12px;
-  border-bottom: 1px solid #1e1e28;
-  background: #0f0f13;
+  padding: 16px 24px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
   flex-shrink: 0;
 }
 
@@ -41,10 +34,9 @@ body {
 }
 
 .app-logo-icon {
-  width: 30px;
-  height: 30px;
-  background: #6366f1;
-  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  background: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -53,28 +45,29 @@ body {
 }
 
 .app-logo-name {
-  font-family: 'Syne', sans-serif;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: #e8e8f0;
+  font-family: var(--font-ui);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text);
 }
 
 .app-logo-name span {
-  color: #6366f1;
+  color: var(--accent);
 }
 
 .app-header-meta {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #3a3a4a;
+  color: var(--text-faint);
 }
 
 /* ── Video input section ── */
 .app-video-section {
-  padding: 16px 16px 0;
+  padding: 20px 24px 0;
   flex-shrink: 0;
 }
 

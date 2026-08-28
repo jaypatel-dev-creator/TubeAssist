@@ -1,15 +1,5 @@
-@keyframes fadeSlideIn {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.5; }
 }
 
 /* ── Base bar ── */
@@ -17,38 +7,36 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 16px;
-  font-family: 'DM Sans', 'Segoe UI', sans-serif;
-  font-size: 13px;
-  font-weight: 500;
+  padding: 8px 24px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
   border-bottom: 1px solid transparent;
-  animation: fadeSlideIn 0.2s ease;
-  transition: background 0.2s, border-color 0.2s, color 0.2s;
 }
 
 /* ── Variants ── */
 .sb-bar.processing {
-  background: #151520;
-  border-color: #2e2e38;
-  color: #a5a5c0;
+  background: var(--bg-subtle);
+  border-color: var(--border);
+  color: var(--text-muted);
 }
 
 .sb-bar.thinking {
-  background: #12121e;
-  border-color: #2a2a45;
-  color: #818cf8;
+  background: var(--bg-subtle);
+  border-color: var(--border);
+  color: var(--text-muted);
 }
 
 .sb-bar.error {
-  background: #1a0f0f;
-  border-color: #6b2030;
-  color: #f87171;
+  background: #fff5f5;
+  border-color: var(--error);
+  color: var(--error);
 }
 
 .sb-bar.success {
-  background: #0d1a12;
-  border-color: #1a4a2a;
-  color: #4ade80;
+  background: #f4faf7;
+  border-color: #b2d9c2;
+  color: var(--success);
 }
 
 /* ── Icon slot ── */
@@ -65,13 +53,11 @@
   animation: spin 0.85s linear infinite;
 }
 
-/* pulse dot for success */
+/* dot for success */
 .sb-bar.success .sb-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #4ade80;
-  animation: pulse 2s ease-in-out infinite;
+  width: 6px;
+  height: 6px;
+  background: var(--success);
 }
 
 /* ── Message text ── */
@@ -80,6 +66,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: 0.01em;
 }
 
 /* ── Dismiss button (error only) ── */
@@ -87,17 +74,14 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: #f87171;
+  color: var(--error);
   opacity: 0.6;
   padding: 2px;
   display: flex;
   align-items: center;
-  border-radius: 4px;
-  transition: opacity 0.15s, background 0.15s;
   flex-shrink: 0;
 }
 
 .sb-dismiss:hover {
   opacity: 1;
-  background: rgba(248, 113, 113, 0.1);
 }

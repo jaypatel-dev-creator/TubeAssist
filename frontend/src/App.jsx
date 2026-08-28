@@ -31,7 +31,7 @@ export default function App() {
     chatMsg,
     handleSend,
     resetChat,
-  } = useChat(videoId, isVideoReady);       
+  } = useChat(videoId, isVideoReady);
 
   // ── Reset chat whenever a new video starts ingesting ──
   useEffect(() => {
@@ -50,11 +50,11 @@ export default function App() {
       <header className="app-header">
         <div className="app-logo">
           <div className="app-logo-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" strokeWidth="2.5"
-              strokeLinecap="round" strokeLinejoin="round">
+              strokeLinecap="square" strokeLinejoin="miter">
               <polygon points="23 7 16 12 23 17 23 7"/>
-              <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+              <rect x="1" y="5" width="15" height="14"/>
             </svg>
           </div>
           <span className="app-logo-name">
