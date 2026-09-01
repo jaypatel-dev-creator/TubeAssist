@@ -1,5 +1,8 @@
 from fastapi import Request
 from fastapi.responses import JSONResponse
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 # ── Base Exception ─────────────────────────────────────────────────────────────
@@ -82,6 +85,8 @@ async def tubeassist_exception_handler(request: Request, exc: TubeAssistExceptio
                 "video_author": exc.video_author,
             }
         )
+    if exc.status_code >= 500:
+        logger.error("[%s] %s", exc.__class__.__name__, exc.message)
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": exc.message}
@@ -89,6 +94,7 @@ async def tubeassist_exception_handler(request: Request, exc: TubeAssistExceptio
 
 
 async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=500,
         content={"error": "An unexpected error occurred."}

@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
+from app.core.logging import setup_logging, get_logger
 from app.core.exceptions import (
     TubeAssistException,
     tubeassist_exception_handler,
@@ -16,15 +17,24 @@ from app.services.embedding_service import init_embedding_model
 from app.services.vector_store_service import init_vector_store
 from app.services.rag_service import init_rag_service
 
+logger = get_logger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ── Startup ────────────────────────────────────────────────────────────────
+    settings = get_settings()
+    setup_logging(settings.app_env)
+    logger.info("Starting TubeAssist...")
+
     init_embedding_model()
     init_vector_store()
     init_rag_service()
+
+    logger.info("TubeAssist is ready.")
     yield
     # ── Shutdown ───────────────────────────────────────────────────────────────
+    logger.info("Shutting down TubeAssist...")
 
 
 def create_app() -> FastAPI:

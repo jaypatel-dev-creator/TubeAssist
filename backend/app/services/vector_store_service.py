@@ -1,7 +1,10 @@
 from pathlib import Path
 from app.core.config import get_settings
+from app.core.logging import get_logger
 from app.services.embedding_service import get_embedding_model
 from app.core.exceptions import VectorStoreException
+
+logger = get_logger(__name__)
 
 
 def _init_chroma():
@@ -28,7 +31,7 @@ def _init_pinecone():
     existing_indexes = [i.name for i in pc.list_indexes()]
     if settings.pinecone_index not in existing_indexes:
         pc.create_index(
-            name=settings.pinecone_index, #index name 
+            name=settings.pinecone_index,
             dimension=3072,
             metric="cosine",
             spec=ServerlessSpec(
@@ -43,7 +46,7 @@ def _init_pinecone():
         pinecone_api_key=settings.pinecone_api_key
     )
 
-#module level variable  (singelton) that will contain either chroma or pinecone db 
+# module level variable (singleton) that will contain either chroma or pinecone db
 _vector_store = None
 
 
@@ -61,12 +64,13 @@ def init_vector_store() -> None:
         _vector_store = _init_chroma()
 
 
-# Public functions  (called by ingestion_service and retriever_service) 
+# Public functions (called by ingestion_service and retriever_service)
 def add_documents(documents) -> None:
     try:
         get_vector_store().add_documents(documents)
     except Exception as e:
-        raise VectorStoreException(f"Failed to store documents: {str(e)}")
+        logger.error("add_documents failed: %s", str(e))
+        raise VectorStoreException("Failed to store documents. Please try again later.")
 
 
 def video_exists(video_id: str) -> bool:
@@ -75,10 +79,11 @@ def video_exists(video_id: str) -> bool:
             return _video_exists_pinecone(video_id)
         return _video_exists_chroma(video_id)
     except Exception as e:
-        raise VectorStoreException(f"Failed to check video existence: {str(e)}")
+        logger.error("video_exists check failed: %s", str(e))
+        raise VectorStoreException("Failed to check video existence. Please try again later.")
 
 
-#private functions 
+# private functions
 def _video_exists_chroma(video_id: str) -> bool:
     results = get_vector_store().get(
         where={"video_id": video_id}, limit=1

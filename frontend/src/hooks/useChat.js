@@ -12,7 +12,7 @@ function makeMessage(role, text, isError = false, fromVideo = true) {
   };
 }
 
-export default function useChat(videoId, isVideoReady) {
+export default function useChat(videoId, sessionId, isVideoReady) {
   const [messages,   setMessages]   = useState([]);
   const [isThinking, setIsThinking] = useState(false);
   const [chatStatus, setChatStatus] = useState(null);
@@ -33,7 +33,7 @@ export default function useChat(videoId, isVideoReady) {
     setChatMsg("Thinking…");
 
     try {
-      const response = await askQuestion(question, videoId);
+      const response = await askQuestion(question, videoId, sessionId);
       const data = response.data;
       setMessages((prev) => [
         ...prev,
@@ -52,7 +52,7 @@ export default function useChat(videoId, isVideoReady) {
     } finally {
       setIsThinking(false);
     }
-  }, [isVideoReady, isThinking, videoId]);
+  }, [isVideoReady, isThinking, videoId, sessionId]);
 
   return {
     messages,

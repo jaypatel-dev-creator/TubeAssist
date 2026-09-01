@@ -1,6 +1,6 @@
 # TubeAssist 🎬
 
-> AI-powered YouTube video assistant — ask questions about any YouTube video using a full RAG pipeline.
+> AI-powered YouTube video assistant — ask questions about any YouTube video using a full RAG pipeline with session-based conversational memory.
 
 ---
 
@@ -22,7 +22,7 @@
 
 TubeAssist lets you paste any YouTube URL and instantly start asking questions about the video — powered by a full RAG pipeline. The system fetches the video transcript via yt-dlp (with Groq Whisper API as fallback), chunks it recursively, converts chunks into vector embeddings using Gemini Embeddings, stores them in ChromaDB (locally) or Pinecone (production), and retrieves the most relevant context to answer your questions using Gemini 3.1 Flash Lite.
 
-If a question is unrelated to the video, the system falls back to general LLM knowledge — clearly indicated to the user with a badge in the chat UI.
+Each video load generates a unique session ID — all follow-up questions within that session carry conversation history, enabling natural multi-turn dialogue. If a question is unrelated to the video, the system falls back to general LLM knowledge — clearly indicated to the user with a badge in the chat UI.
 
 ---
 
@@ -52,20 +52,24 @@ YouTube URL
 ┌──────────────────────────────────────────┐
 │           RAG QUERY PIPELINE             │
 │                                          │
-│  User Question → retriever_service       │
-│                  (similarity search,     │
-│                   video_id filter)       │
-│                          │               │
-│              Stage 1 — Score filter      │
-│              Stage 2 — LLM-as-a-Judge    │
-│                  ├── relevant → RAG      │
-│                  └── irrelevant → LLM    │
-│                          fallback        │
-│                          │               │
-│                          ▼               │
-│                  rag_service             │
-│               (context +                 │
-│                + Gemini 3.1 Flash Lite ) │
+│  User Question + session_id              │
+│       → history fetched from             │
+│         _session_store[session_id]       │
+│       → retriever_service                │
+│         (similarity search,              │
+│          video_id filter)                │
+│                  │                       │
+│      Stage 1 — Score filter              │
+│      Stage 2 — LLM-as-a-Judge            │
+│          ├── relevant → RAG answer       │
+│          └── irrelevant → LLM fallback   │
+│                  │                       │
+│                  ▼                       │
+│          rag_service                     │
+│       (history + context +               │
+│        Gemini 3.1 Flash Lite)            │
+│                  │                       │
+│      Q+A appended to session history     │
 └──────────────────────────────────────────┘
 ```
 
@@ -75,10 +79,11 @@ YouTube URL
 
 | Technique | Implementation |
 |---|---|
-| Metadata filtering | `filter={"video_id": video_id}` — scoped retrieval per video |
+| Metadata filtering | `filter={\"video_id\": video_id}` — scoped retrieval per video |
 | Two-stage relevance filtering | Score threshold (0.7) + LLM-as-a-Judge |
 | LLM-as-a-Judge | `NO_RELEVANT_CONTEXT` pattern — LLM self-evaluates context relevance |
 | LLM fallback | General knowledge answer when no relevant context found |
+| Session-based STM | Per-session history window (last 6 messages) injected into every prompt |
 
 ### Two-Stage Relevance Filtering
 
@@ -89,6 +94,10 @@ Chunks filtered by cosine distance threshold (`0.7`). Chunks that don't pass tri
 Even if chunks pass the score filter, Gemini is instructed to return sentinel string `"NO_RELEVANT_CONTEXT"` if the retrieved context doesn't actually answer the question. Catches subtle irrelevance that pure distance metrics miss.
 
 Both stages route to the same `_llm_fallback()` — answering from general knowledge and returning `from_video: false` to the frontend.
+
+### Session-Based Conversational Memory
+
+Each video load generates a `session_id` (UUID) on the frontend. Every subsequent question carries this ID to the backend, which maintains an in-memory session store (`dict[str, list[dict]]`). The last 6 messages (3 user + 3 AI turns) are injected into both the RAG prompt and the fallback prompt — enabling natural follow-up questions without repeating context. Memory is non-persistent by design: it lives in process memory and resets on server restart.
 
 ---
 
@@ -154,7 +163,7 @@ npm run dev
 |---|---|---|---|
 | `GEMINI_API_KEY` | Yes | — | Google Gemini API key |
 | `GROQ_API_KEY` | Yes | — | Groq API key for Whisper fallback |
-| `APP_ENV` | No | `development` | controls Swagger UI visibility and CORS origins |
+| `APP_ENV` | No | `development` | Controls Swagger UI visibility and log level |
 | `VECTOR_STORE` | No | `chroma` | `chroma` locally, `pinecone` in production |
 | `PINECONE_API_KEY` | Pinecone only | — | Pinecone API key |
 | `PINECONE_INDEX` | Pinecone only | `tubeassist` | Pinecone index name |
@@ -174,7 +183,7 @@ Config is managed via `pydantic-settings` `BaseSettings` — validated at startu
 **Local dev:**
 ```bash
 uvicorn app.main:app --reload
-# reads .env → uses ChromaDB → Swagger UI at /docs
+# reads .env → uses ChromaDB → Swagger UI at /docs → DEBUG log level
 ```
 
 **Production (Render):**
@@ -216,26 +225,28 @@ Connect GitHub repo to Vercel. Set `VITE_API_URL=https://your-render-url.com` in
 
 **Why yt-dlp over youtube-transcript-api?** yt-dlp handles both caption extraction and metadata in one library, supports more video formats, and is actively maintained.
 
+**Why in-process dict for STM over Redis?** The requirement is non-persistent, single-server conversational memory scoped to a video session. An in-process `dict[str, list[dict]]` is zero-dependency, zero-latency, and matches the requirement exactly. Redis adds operational complexity (another service to provision, connect, and monitor) for no functional gain at this scale. The session store is intentionally simple — it resets on restart, which is the desired behaviour.
+
+**Why a dedicated `core/logging.py`?** Centralising `setup_logging()` and `get_logger()` in one module means every service file does a single import instead of configuring `logging.basicConfig()` inline or at module level. Log level is environment-driven (`DEBUG` in development, `INFO` in production) without any file touching `APP_ENV` directly.
+
 ---
 
 ## ⚠️ Known Limitations & Infrastructure Notes
 
 ### YouTube Transcript Fetch — Render Deployment
-**Status:** Blocked in production  
-**Root cause:** Render runs on AWS datacenter IPs. YouTube blanket-blocks
-datacenter IP ranges for yt-dlp requests — including the Whisper audio
-fallback, which also uses yt-dlp for audio download. Residential IPs work
-fine; the issue is *who* makes the request, not the code itself.  
-**Verified locally:** Both transcript fetch and Whisper fallback work
-perfectly on local/residential IPs.  
-**Production fix:** Paid transcript API (Supadata, RapidAPI) or residential
-proxy service. Documented as a known infrastructure limitation.
+**Status:** Blocked in production
+**Root cause:** Render runs on AWS datacenter IPs. YouTube blanket-blocks datacenter IP ranges for yt-dlp requests — including the Whisper audio fallback, which also uses yt-dlp for audio download. Residential IPs work fine; the issue is *who* makes the request, not the code itself.
+**Verified locally:** Both transcript fetch and Whisper fallback work perfectly on local/residential IPs.
+**Production fix:** Paid transcript API (Supadata, RapidAPI) or residential proxy service. Documented as a known infrastructure limitation.
+
+### STM — Non-Persistent by Design
+Session history lives in process memory. Server restart clears all sessions. This is intentional — no persistence requirement exists. Redis or a database-backed store is a straightforward upgrade path if persistence is needed.
 
 ### Groq Whisper — Video Length
 Groq's free tier Whisper endpoint has a 25MB file size limit. Audio is downloaded at 64kbps mp3, keeping videos up to ~50 minutes safely under the limit. Videos beyond that trigger a clean 422 error with a clear message to the user.
 
 ### Multilingual Content
-yt-dlp fetches captions in whatever language is available — it does not filter by language. If a video has only Hindi captions, those are stored as-is and an English question will return `from_video: false` — embeddings won't align across languages, Stage 1 score filter fails, and the LLM fallback is triggered. For the Groq Whisper fallback, `language` parameter is intentionally not set so `whisper-large-v3-turbo` auto-detects and transcribes correctly instead of hallucinating English for non-English audio. Same outcome applies — non-English transcript + English question = low similarity scores = `from_video: false` and LLM fallback. No crash in either case. Translation before chunking is a known gap, planned for v2.
+yt-dlp fetches captions in whatever language is available — it does not filter by language. If a video has only Hindi captions, those are stored as-is and an English question will return `from_video: false` — embeddings won't align across languages, Stage 1 score filter fails, and the LLM fallback is triggered. Translation before chunking is a known gap, planned for a future iteration.
 
 ### Cold Start
 Backend deployed on Render free tier — expect 50–60 second cold start after inactivity.
@@ -243,4 +254,4 @@ Backend deployed on Render free tier — expect 50–60 second cold start after 
 ---
 
 ## Roadmap
-Session-based conversation memory (Redis) and streaming responses planned for v2.
+Streaming responses and persistent cross-session memory planned for a future iteration.

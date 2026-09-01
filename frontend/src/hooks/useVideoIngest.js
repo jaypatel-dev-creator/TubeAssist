@@ -4,6 +4,7 @@ import { ingestVideo } from "../api/tubeassist";
 export default function useVideoIngest() {
   const [videoId,      setVideoId]      = useState("");
   const [videoTitle,   setVideoTitle]   = useState("");
+  const [sessionId,    setSessionId]    = useState("");
   const [isIngesting,  setIsIngesting]  = useState(false);
   const [ingestStatus, setIngestStatus] = useState(null);
   const [ingestMsg,    setIngestMsg]    = useState("");
@@ -11,6 +12,7 @@ export default function useVideoIngest() {
   const reset = useCallback(() => {
     setVideoId("");
     setVideoTitle("");
+    setSessionId("");
     setIngestStatus(null);
     setIngestMsg("");
   }, []);
@@ -18,6 +20,7 @@ export default function useVideoIngest() {
   const handleIngest = useCallback(async (url) => {
     setVideoId("");
     setVideoTitle("");
+    setSessionId("");
     setIsIngesting(true);
     setIngestStatus("processing");
     setIngestMsg("Processing video…");
@@ -28,6 +31,7 @@ export default function useVideoIngest() {
 
       setVideoId(data.video_id || "");
       setVideoTitle(data.video_title || "Untitled Video");
+      setSessionId(crypto.randomUUID());
       setIngestStatus("success");
       setIngestMsg("Video ready — start asking questions!");
 
@@ -37,8 +41,10 @@ export default function useVideoIngest() {
 
       if (status === 409 && data?.video_id) {
         // Video already indexed — restore state and allow chat
+        // Still generate a fresh session_id so history is clean
         setVideoId(data.video_id);
         setVideoTitle(data.video_title || "Untitled Video");
+        setSessionId(crypto.randomUUID());
         setIngestStatus("success");
         setIngestMsg(`'${data.video_title}' is already indexed — start asking questions!`);
       } else {
@@ -47,6 +53,7 @@ export default function useVideoIngest() {
                         err.message ||
                         "Something went wrong.";
         setVideoId("");
+        setSessionId("");
         setIngestStatus("error");
         setIngestMsg(message);
       }
@@ -58,6 +65,7 @@ export default function useVideoIngest() {
   return {
     videoId,
     videoTitle,
+    sessionId,
     isIngesting,
     ingestStatus,
     ingestMsg,

@@ -1,6 +1,6 @@
 # TubeAssist — Backend
 
-FastAPI backend implementing a full RAG pipeline over YouTube video transcripts. Accepts a video URL, extracts and indexes the transcript, then answers natural language questions using retrieved context with two-stage relevance filtering and LLM fallback.
+FastAPI backend implementing a full RAG pipeline over YouTube video transcripts. Accepts a video URL, extracts and indexes the transcript, then answers natural language questions using retrieved context with two-stage relevance filtering, session-based conversational memory, and LLM fallback.
 
 ---
 
@@ -26,14 +26,15 @@ backend/
 ├── app/
 │   ├── core/
 │   │   ├── config.py                 # pydantic-settings BaseSettings + get_settings()
-│   │   └── exceptions.py             # typed exception hierarchy + global handlers
+│   │   ├── exceptions.py             # typed exception hierarchy + global handlers
+│   │   └── logging.py                # setup_logging() + get_logger() — centralised logging config
 │   ├── routes/
 │   │   ├── health_route.py           # GET /health
 │   │   ├── ingest_route.py           # POST /videos/ingest
 │   │   └── chat_route.py             # POST /chat/ask
 │   ├── schemas/
 │   │   ├── ingest_schema.py          # VideoIngestRequest, VideoIngestSuccess
-│   │   └── chat_schema.py            # ChatRequest, ChatResponse, ChunkMetadata
+│   │   └── chat_schema.py            # ChatRequest (incl. session_id), ChatResponse, ChunkMetadata
 │   ├── services/
 │   │   ├── providers/
 │   │   │   ├── youtube_provider.py   # yt-dlp caption extraction
@@ -45,13 +46,12 @@ backend/
 │   │   ├── vector_store_service.py   # ChromaDB / Pinecone singleton
 │   │   ├── retriever_service.py      # similarity search + score normalization
 │   │   ├── ingestion_service.py      # ingestion orchestrator
-│   │   └── rag_service.py            # RAG + LLM fallback 
+│   │   └── rag_service.py            # RAG + STM session store + LLM fallback
 │   └── main.py                       # FastAPI app + lifespan + exception handlers
 ├── .env.example
 ├── render.yaml
 └── requirements.txt
 ```
-
 
 ---
 
@@ -75,12 +75,16 @@ YouTube URL
 │         metadata: video_id, title, author, chunk_index
 │
 └─► add_documents()                           # embed + persist
-ChromaDB (local) / Pinecone (prod)
+          ChromaDB (local) / Pinecone (prod)
 ```
 
 ### Phase 2 — Query
 ```
-User Question
+User Question + session_id
+│
+├─► _get_history(session_id)
+│         last 6 messages fetched from _session_store[session_id]
+│         (windowed to 3 user + 3 AI turns)
 │
 ├─► retrieve_with_scores()
 │         k=6, filter={"video_id": video_id}
@@ -95,10 +99,14 @@ User Question
 │         └── LLM returns "NO_RELEVANT_CONTEXT" → LLM fallback → from_video: false
 │
 ├─► ChatPromptTemplate
-│         system + context + question
+│         system + context + history + question
 │
-└─► Gemini 3.1 Flash-Lite (temperature=0.3)
+├─► Gemini 3.1 Flash-Lite (temperature=0.3)
+│
+└─► _append_to_history(session_id, question, answer)
+          Q+A pair written back to _session_store[session_id]
 ```
+
 ---
 
 ## API Reference
@@ -110,6 +118,7 @@ User Question
 ```
 
 ---
+
 ### `POST /videos/ingest`
 
 **Request**
@@ -155,9 +164,12 @@ All errors return `{ "error": "..." }`. The `409` response also includes `video_
 ```json
 {
   "question": "What is self-attention?",
-  "video_id": "VIDEO_ID"
+  "video_id": "VIDEO_ID",
+  "session_id": "uuid-generated-per-video-load"
 }
 ```
+
+`session_id` is optional — if omitted, the request is treated as stateless with no history.
 
 **Response**
 ```json
@@ -176,7 +188,11 @@ All errors return `{ "error": "..." }`. The `409` response also includes `video_
 
 **Module-level singletons + lifespan init** — expensive objects (embedding model, vector store, LLM client, prompts) are initialized once at startup via `lifespan()` and accessed as module-level singletons. No FastAPI DI chain — `Depends()` has no role here since there are no per-request resources to inject.
 
-**Typed exception hierarchy** — `TubeAssistException` base class with domain subclasses (`InvalidURLException`, `TranscriptFetchException`, `VideoAlreadyIndexedException`, `VectorStoreException`, `RAGException`). Two global handlers in `main.py` ensure every error returns the correct HTTP status code with a consistent `{"error": "..."}` shape. Routes contain zero try/except.
+**Session-based STM** — `rag_service.py` maintains a module-level `_session_store: dict[str, list[dict]] = {}`. The dict itself is a singleton; each value is an isolated list per `session_id`. Every `ask()` call fetches the last 6 messages for that session (window of 3 turns), injects them into the prompt as formatted `User: / Assistant:` history, then appends the new Q+A pair after the LLM responds. Both the RAG prompt and the general fallback prompt receive history — follow-up questions work regardless of whether the answer came from the video or general knowledge. Memory is non-persistent: it resets on server restart by design.
+
+**Typed exception hierarchy** — `TubeAssistException` base class with domain subclasses (`InvalidURLException`, `TranscriptFetchException`, `VideoAlreadyIndexedException`, `VectorStoreException`, `RAGException`). Two global handlers in `main.py` ensure every error returns the correct HTTP status code with a consistent `{"error": "..."}` shape. Routes contain zero try/except. Internal error details (raw API errors, stack traces) are logged server-side only — never exposed to the client.
+
+**Centralised logging** — `core/logging.py` owns `setup_logging(app_env)` and `get_logger(name)`. Called once in `lifespan()` with `settings.app_env` — `DEBUG` in development, `INFO` in production. Every service file calls `get_logger(__name__)` for a named logger. Noisy third-party loggers (`httpx`, `httpcore`, `chromadb`, `google.auth`, etc.) are suppressed to `WARNING`.
 
 **Pydantic-settings config** — `BaseSettings` with `get_settings()` + `@lru_cache`. Validated at startup — missing `GEMINI_API_KEY` or `GROQ_API_KEY` refuses server start immediately rather than failing mid-request.
 
@@ -224,6 +240,8 @@ Integration testing via Swagger UI (`http://localhost:8000/docs`):
 `POST /chat/ask` edge cases:
 - Relevant question → grounded answer, `from_video: true`
 - Irrelevant question → LLM fallback, `from_video: false`
+- Follow-up question (same `session_id`) → history injected, context-aware answer
+- Fresh `session_id` on same `video_id` → clean history, no bleed from prior session
 
 ---
 
@@ -231,8 +249,10 @@ Integration testing via Swagger UI (`http://localhost:8000/docs`):
 
 - **RAG Pipeline Design** — full ingestion + retrieval pipeline: transcript extraction → recursive chunking → vector embeddings → similarity retrieval → grounded LLM generation with fallback
 - **Advanced RAG** — two-stage relevance filtering (score threshold + LLM-as-a-Judge) and metadata filtering for scoped per-video retrieval
+- **Session-Based STM** — in-process `dict[str, list[dict]]` keyed by `session_id`; windowed history injected into every prompt; isolated per session with no cross-contamination
 - **Vector Database & Score Normalization** — handled backend-specific score scales (Chroma distance vs Pinecone similarity) with `1 - score` normalization for a unified threshold
 - **Pydantic-Settings Config** — `BaseSettings` with `@lru_cache` for validated, type-safe config as a singleton — replaces scattered `os.getenv()` calls
 - **Module-Level Singletons** — production FastAPI pattern: expensive resources initialized once in `lifespan()`, accessed directly in services — no DI chain needed
-- **Typed Exception Hierarchy** — base exception + domain subclasses + global handlers: routes stay clean, errors always return correct HTTP status codes
+- **Typed Exception Hierarchy** — base exception + domain subclasses + global handlers: routes stay clean, errors always return correct HTTP status codes, internals never leak to clients
+- **Centralised Logging** — `core/logging.py` pattern: `setup_logging()` + `get_logger(__name__)` per file; environment-driven log level; third-party loggers suppressed
 - **Dual Transcript Strategy** — yt-dlp primary with Groq Whisper API fallback; 64kbps bitrate cap + 24MB size guard handle Groq's free tier file size constraint cleanly

@@ -9,5 +9,6 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 def ask_question(request: ChatRequest) -> dict:
     return ask(
         question=request.question,
-        video_id=request.video_id
+        video_id=request.video_id,
+        session_id=request.session_id
     )

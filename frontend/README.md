@@ -1,6 +1,6 @@
 # TubeAssist — Frontend
 
-React-based chat interface for the TubeAssist RAG pipeline. Handles video ingestion, real-time chat state, and API communication with the FastAPI backend.
+React-based chat interface for the TubeAssist RAG pipeline. Handles video ingestion, session management, real-time chat state, and API communication with the FastAPI backend.
 
 ---
 
@@ -15,14 +15,14 @@ src/
 │   ├── MessageBubble.jsx    # user/AI bubbles + general knowledge badge
 │   └── StatusBar.jsx        # processing / thinking / error / success states
 ├── hooks/
-│   ├── useVideoIngest.js    # ingestion state, video_id, video_title, error handling
-│   └── useChat.js           # message history, from_video flag
+│   ├── useVideoIngest.js    # ingestion state, video_id, session_id generation, error handling
+│   └── useChat.js           # message history, session_id forwarding, from_video flag
 ├── api/
 │   ├── client.js            # plain axios instance (baseURL, timeout, Content-Type)
-│   └── tubeassist.js        # ingestVideo(), askQuestion()
+│   └── tubeassist.js        # ingestVideo(), askQuestion(question, videoId, sessionId)
 ├── utils/
 │   └── validateYouTubeUrl.js
-├── App.jsx                  # layout + state orchestration
+├── App.jsx                  # layout + state orchestration + session_id wiring
 └── index.css
 ```
 
@@ -43,9 +43,27 @@ const client = axios.create({
 Two endpoints consumed:
 
 ```js
-POST /videos/ingest  → { url }               → { status, video_id, video_title }
-POST /chat/ask       → { question, video_id } → { answer, sources, from_video }
+POST /videos/ingest  → { url }
+                     ← { status, video_id, video_title, video_author, chunks_stored }
+
+POST /chat/ask       → { question, video_id, session_id }
+                     ← { answer, sources, from_video }
 ```
+
+---
+
+## Session Management
+
+Each video load generates a `session_id` via `crypto.randomUUID()` inside `useVideoIngest`. This ID is:
+
+- Generated on every successful ingest response (200)
+- Generated on 409 (already indexed) — fresh session even for existing videos
+- Cleared on ingest error — no session assigned until a video is successfully ready
+- Passed from `useVideoIngest` → `App.jsx` → `useChat` as a prop
+- Sent with every `POST /chat/ask` request so the backend can maintain per-session conversation history
+- Included in `useChat`'s `useCallback` dependency array — `handleSend` always closes over the current session, never a stale one
+
+New video load = new `session_id` = clean isolated history on the backend. No cross-video memory bleed.
 
 ---
 
@@ -62,6 +80,8 @@ npm run dev
 
 ## Key Implementation Notes
 
+**Session ID flow** — `useVideoIngest` owns session generation. `App.jsx` destructures `sessionId` alongside `videoId` and passes both into `useChat(videoId, sessionId, isVideoReady)`. `useChat` forwards `sessionId` to every `askQuestion()` call.
+
 **Manual response unwrap** — `response.data` extracted manually in each hook after axios call.
 
 **Manual error extraction** — catch blocks in both `useVideoIngest` and `useChat` extract error messages via `err.response?.data?.error` → `err.response?.data?.detail` → `err.message` fallback chain.
@@ -72,6 +92,6 @@ npm run dev
 
 **Guard condition** — `ChatInput` disabled until `isVideoReady = !!videoTitle && !isIngesting`.
 
-**Already indexed** — `409` response handled as a success-like state in `useVideoIngest` catch block — extracts `video_id` and `video_title` from the error response body and unlocks chat with the existing video.
+**Already indexed** — `409` response handled as a success-like state in `useVideoIngest` catch block — extracts `video_id` and `video_title` from the error response body, generates a fresh `session_id`, and unlocks chat with the existing video.
 
-**Chat reset** — `useEffect` watches `isIngesting` and calls `resetChat()` on new video load.
+**Chat reset** — `useEffect` watches `isIngesting` and calls `resetChat()` on new video load — clears message history in sync with the new session on the backend.

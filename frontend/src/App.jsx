@@ -15,6 +15,7 @@ export default function App() {
   const {
     videoId,
     videoTitle,
+    sessionId,
     isIngesting,
     ingestStatus,
     ingestMsg,
@@ -31,7 +32,7 @@ export default function App() {
     chatMsg,
     handleSend,
     resetChat,
-  } = useChat(videoId, isVideoReady);
+  } = useChat(videoId, sessionId, isVideoReady);
 
   // ── Reset chat whenever a new video starts ingesting ──
   useEffect(() => {
