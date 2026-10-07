@@ -46,7 +46,7 @@ export default function useVideoIngest() {
         setVideoTitle(data.video_title || "Untitled Video");
         setSessionId(crypto.randomUUID());
         setIngestStatus("success");
-        setIngestMsg(`'${data.video_title}' is already indexed — start asking questions!`);
+        setIngestMsg(`Already indexed — start asking questions! (${data.video_title || "Untitled Video"})`);
       } else {
         const message = data?.error ||
                         data?.detail ||

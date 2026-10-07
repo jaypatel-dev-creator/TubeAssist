@@ -4,10 +4,14 @@ from pathlib import Path
 from groq import Groq
 
 from app.core.config import get_settings
-from app.core.exceptions import TranscriptFetchException
+from app.core.exceptions import TranscriptFetchException, UnsupportedLanguageException
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 MAX_AUDIO_SIZE_BYTES = 24 * 1024 * 1024  # 24MB — safe margin under Groq's 25MB free tier limit
+ENGLISH_LANGUAGE_CODES = {"english", "en"}  # Whisper reports the detected language as a name or ISO code
 
 
 # download_audio() uses yt-dlp to download audio as mp3 at 64kbps to feed to Groq Whisper API
@@ -58,12 +62,27 @@ def get_whisper_transcript(url: str) -> str:
             transcription = client.audio.transcriptions.create(
                 file=audio_file,
                 model="whisper-large-v3-turbo",  # best price-to-performance on Groq free tier
-                response_format="text",          # returns plain string directly
+                response_format="verbose_json",  # includes the auto-detected language alongside the text
                 temperature=0.0                  # deterministic output
-                # language not set — whisper-large-v3-turbo auto-detects, supports multilingual content
+                # language deliberately NOT set — forcing it would make Whisper emit English-looking
+                # garbage for non-English audio instead of letting us detect and reject it
             )
 
-        return transcription  # response_format="text" returns the transcript string directly
+        # English-only gate: reject any other detected language with a clear error
+        detected = getattr(transcription, "language", None)
+        if detected is None and isinstance(transcription, dict):
+            detected = transcription.get("language")
+
+        if detected is None:
+            # field missing (SDK/response shape mismatch) — don't block the whole fallback, but make it visible
+            logger.warning("Whisper response had no language field; skipping English-only check.")
+        elif str(detected).strip().lower() not in ENGLISH_LANGUAGE_CODES:
+            raise UnsupportedLanguageException(str(detected))
+
+        text = getattr(transcription, "text", None)
+        if text is None and isinstance(transcription, dict):
+            text = transcription.get("text")
+        return text or ""
 
     finally:
         try:

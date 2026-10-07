@@ -83,7 +83,7 @@ def video_exists(video_id: str) -> bool:
         raise VectorStoreException("Failed to check video existence. Please try again later.")
 
 
-# private functions
+#=
 def _video_exists_chroma(video_id: str) -> bool:
     results = get_vector_store().get(
         where={"video_id": video_id}, limit=1

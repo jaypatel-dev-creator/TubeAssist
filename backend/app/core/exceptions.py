@@ -46,6 +46,15 @@ class EmptyTranscriptException(TubeAssistException):
         )
 
 
+class UnsupportedLanguageException(TubeAssistException):
+    def __init__(self, language: str | None = None):
+        detail = f" (detected: {language})" if language else ""
+        super().__init__(
+            message=f"Only English videos are supported{detail}.",
+            status_code=422
+        )
+
+
 class VideoAlreadyIndexedException(TubeAssistException):
     def __init__(self, video_id: str, video_title: str, video_author: str):
         self.video_id = video_id

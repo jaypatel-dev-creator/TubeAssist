@@ -3,7 +3,7 @@ import re
 from app.services.providers.youtube_provider import get_youtube_transcript
 from app.services.providers.whisper_provider import get_whisper_transcript
 from app.services.providers.metadata_provider import get_video_metadata
-from app.core.exceptions import InvalidURLException, TranscriptFetchException
+from app.core.exceptions import InvalidURLException, TranscriptFetchException, TubeAssistException
 
 
 def extract_video_id(url: str) -> str:
@@ -32,6 +32,8 @@ def get_transcript(url: str) -> dict:
     except Exception:
         try:
             transcript_text = get_whisper_transcript(url)
+        except TubeAssistException:
+            raise  # keep specific errors (unsupported language, video too long) intact for the user
         except Exception:
             raise TranscriptFetchException()
 

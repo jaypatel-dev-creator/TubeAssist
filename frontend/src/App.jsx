@@ -80,7 +80,7 @@ export default function App() {
         <StatusBar
           status={status}
           message={statusMsg}
-          autoClearSuccess={3000}
+          autoClearSuccess={8000}
         />
       </div>
 
