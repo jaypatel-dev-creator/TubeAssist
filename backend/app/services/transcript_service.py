@@ -34,7 +34,8 @@ def get_transcript(url: str) -> dict:
             transcript_text = get_whisper_transcript(url)
         except TubeAssistException:
             raise  # keep specific errors (unsupported language, video too long) intact for the user
-        except Exception:
+        
+        except Exception: 
             raise TranscriptFetchException()
 
     metadata = get_video_metadata(url)

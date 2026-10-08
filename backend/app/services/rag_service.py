@@ -4,6 +4,9 @@ from langchain_core.prompts import ChatPromptTemplate
 from app.services.retriever_service import retrieve_with_scores
 from app.core.config import get_settings
 from app.core.exceptions import RAGException
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 THRESHOLD = 0.7
@@ -105,8 +108,9 @@ def _llm_fallback(question: str, history: list[dict]) -> dict:
         response = get_llm().invoke(messages)
         text = extract_text_content(response.content)
         return {"answer": text, "sources": [], "from_video": False}
-    except Exception as e:
-        raise RAGException(f"Fallback LLM call failed: {str(e)}")
+    except Exception:
+        logger.exception("Fallback LLM call failed")
+        raise RAGException("Could not generate an answer right now. Please try again.")
 
 
 def ask(question: str, video_id: str | None = None, session_id: str | None = None) -> dict:
@@ -148,5 +152,6 @@ def ask(question: str, video_id: str | None = None, session_id: str | None = Non
 
     except RAGException:
         raise
-    except Exception as e:
-        raise RAGException(f"Failed to generate answer: {str(e)}")
+    except Exception:
+        logger.exception("Failed to generate answer")
+        raise RAGException("Could not generate an answer right now. Please try again.")
